@@ -26,7 +26,7 @@ func NewQwenClient(model string, httpCli IHttpClient) *QwenClient {
 
 	return &QwenClient{
 		Model:   qwenModel,
-		baseURL: QwenDashscopeURL,
+		baseURL: QwenURL(),
 		token:   os.Getenv("DASHSCOPE_API_KEY"),
 		httpCli: httpCli,
 	}

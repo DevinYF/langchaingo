@@ -4,7 +4,11 @@ import (
 	"log"
 )
 
-const QwenDashscopeURL = "https://dashscope.aliyuncs.com/api/v1/services/aigc/text-generation/generation"
+const (
+	DashScopeBaseURL = "https://dashscope.aliyuncs.com"
+	QwenSubURL       = "/api/v1/services/aigc/text-generation/generation"
+	QwenVLSubURL     = "/api/v1/services/aigc/multimodal-generation/generation"
+)
 
 type QwenModel string
 
@@ -17,6 +21,16 @@ const (
 )
 
 type Model struct{}
+
+// text-generation only.
+func QwenURL() string {
+	return DashScopeBaseURL + QwenSubURL
+}
+
+// multimodal.
+func QwenVLURL() string {
+	return DashScopeBaseURL + QwenVLSubURL
+}
 
 func ChoseQwenModel(model string) QwenModel {
 	m := Model{}
