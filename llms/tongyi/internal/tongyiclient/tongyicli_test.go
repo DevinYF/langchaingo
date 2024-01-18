@@ -1,51 +1,81 @@
-package qwenclient
+package tongyiclient
 
 import (
 	"context"
+	"os"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	httpclient "github.com/tmc/langchaingo/llms/tongyi/internal/httpclient"
+	httpclient "github.com/tmc/langchaingo/llms/tongyi/internal/tongyiclient/httpclient"
+	wanx "github.com/tmc/langchaingo/llms/tongyi/internal/tongyiclient/wanx"
 	"go.uber.org/mock/gomock"
 )
 
-func newQwenClient(t *testing.T, model string) *QwenClient {
+func newTongyiClient(t *testing.T, model string) *TongyiClient {
 	t.Helper()
-	cli := NewQwenClient(model, httpclient.NewHTTPClient())
+	token := os.Getenv("DASHSCOPE_API_KEY")
+
+	cli := NewTongyiClient(model, token)
 	if cli.token == "" {
 		t.Skip("token is empty")
 	}
 	return cli
 }
 
-func newMockClient(t *testing.T, model string, ctrl *gomock.Controller, f mockFn) *QwenClient {
+func newMockClient(t *testing.T, model string, ctrl *gomock.Controller, f mockFn) *TongyiClient {
 	t.Helper()
 
 	mockHTTPCli := httpclient.NewMockIHttpClient(ctrl)
+	fackToken := ""
+
 	f(mockHTTPCli)
 
-	qwenCli := NewQwenClient(model, mockHTTPCli)
+	qwenCli := newTongyiCLientWithHttpCli(model, fackToken, mockHTTPCli)
 	return qwenCli
 }
 
 type mockFn func(mockHTTPCli *httpclient.MockIHttpClient)
 
-func TestStreamingChunk(t *testing.T) {
+func TestBasic(t *testing.T) {
 	t.Parallel()
 	ctx := context.TODO()
 
-	cli := newQwenClient(t, "qwen-turbo")
+	cli := newTongyiClient(t, "")
 
-	output := ""
-
-	input := Input{
-		Messages: []Message{
+	input := TextInput{
+		Messages: []TextMessage{
 			{Role: "user", Content: "Hello!"},
 		},
 	}
 
-	req := &QwenRequest{
+	req := &TextQwenRequest{
+		Model: "qwen-turbo",
+		Input: input,
+	}
+
+	resp, err := cli.CreateCompletion(ctx, req)
+
+	require.NoError(t, err)
+	assert.Regexp(t, "hello|hi|how|assist", resp.Output.Choices[0].Message.Content)
+}
+
+func TestStreamingChunk(t *testing.T) {
+	t.Parallel()
+	ctx := context.TODO()
+
+	cli := newTongyiClient(t, "qwen-turbo")
+
+	output := ""
+
+	input := TextInput{
+		Messages: []TextMessage{
+			{Role: "user", Content: "Hello!"},
+		},
+	}
+
+	req := &TextQwenRequest{
+		// Model: "qwen-turbo",
 		Input: input,
 		StreamingFunc: func(ctx context.Context, chunk []byte) error {
 			output += string(chunk)
@@ -59,6 +89,31 @@ func TestStreamingChunk(t *testing.T) {
 	assert.Regexp(t, "hello|hi|how|assist", output)
 }
 
+func TestImageGeneration(t *testing.T) {
+	t.Parallel()
+	ctx := context.TODO()
+
+	cli := newTongyiClient(t, "wanx-v1")
+
+	req := &wanx.WanxImageSynthesisRequest{
+		Model: "wanx-v1",
+		Input: wanx.WanxImageSynthesisInput{
+			Prompt: "A beautiful sunset",
+		},
+	}
+
+	imgBlobs, err := cli.CreateImageGeneration(ctx, req)
+	require.NoError(t, err)
+	require.NotEmpty(t, imgBlobs)
+
+	for _, blob := range imgBlobs {
+		assert.NotEmpty(t, blob.Data)
+		assert.Equal(t, "image/png", blob.ImgType)
+
+	}
+
+}
+
 func TestMockStreamingChunk(t *testing.T) {
 	t.Parallel()
 	ctx := context.TODO()
@@ -69,13 +124,13 @@ func TestMockStreamingChunk(t *testing.T) {
 
 	output := ""
 
-	input := Input{
-		Messages: []Message{
+	input := TextInput{
+		Messages: []TextMessage{
 			{Role: "user", Content: "Hello!"},
 		},
 	}
 
-	req := &QwenRequest{
+	req := &TextQwenRequest{
 		Input: input,
 		StreamingFunc: func(ctx context.Context, chunk []byte) error {
 			output += string(chunk)
@@ -96,13 +151,13 @@ func TestMockBasic(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 	cli := newMockClient(t, "qwen-turbo", ctrl, _mockSyncFunc)
-	input := Input{
-		Messages: []Message{
+	input := TextInput{
+		Messages: []TextMessage{
 			{Role: "user", Content: "Hello!"},
 		},
 	}
 
-	req := &QwenRequest{
+	req := &TextQwenRequest{
 		Input: input,
 	}
 
@@ -198,14 +253,14 @@ func _mockAsyncFunc(mockHTTPCli *httpclient.MockIHttpClient) {
 func _mockSyncFunc(mockHTTPCli *httpclient.MockIHttpClient) {
 	ctx := context.TODO()
 
-	mockResp := QwenOutputMessage{
-		Output: QwenOutput{
+	mockResp := TextQwenOutputMessage{
+		Output: TextQwenOutput{
 			Choices: []struct {
-				Message      Message `json:"message"`
-				FinishReason string  `json:"finish_reason"`
+				Message      TextMessage `json:"message"`
+				FinishReason string      `json:"finish_reason"`
 			}{
 				{
-					Message: Message{
+					Message: TextMessage{
 						Content: "Hello! This is a mock message.",
 						Role:    "assistant",
 					},

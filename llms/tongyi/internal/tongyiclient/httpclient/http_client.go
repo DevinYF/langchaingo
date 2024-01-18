@@ -30,32 +30,12 @@ type HTTPCli struct {
 	sseStream chan string
 }
 
+var _ IHttpClient = (*HTTPCli)(nil)
+
 func NewHTTPClient() *HTTPCli {
 	return &HTTPCli{
 		client:    http.Client{},
 		sseStream: nil,
-	}
-}
-
-type HeaderMap map[string]string
-
-func WithHeader(header HeaderMap) HTTPOption {
-	return func(c *HTTPCli) {
-		for k, v := range header {
-			c.req.Header.Set(k, v)
-		}
-	}
-}
-
-func WithTimeout(timeout time.Duration) HTTPOption {
-	return func(c *HTTPCli) {
-		c.client.Timeout = timeout
-	}
-}
-
-func withStream() HTTPOption {
-	return func(c *HTTPCli) {
-		c.req.Header.Set("Accept", "text/event-stream")
 	}
 }
 
@@ -110,7 +90,7 @@ func (c *HTTPCli) PostSSE(ctx context.Context, urll string, reqbody interface{},
 	sseStream := make(chan string, chanBuffer)
 	c.sseStream = sseStream
 
-	options = append(options, withStream(), WithHeader(HeaderMap{"content-type": "application/json"}))
+	options = append(options, WithStream(), WithHeader(HeaderMap{"content-type": "application/json"}))
 
 	errChan := make(chan error)
 

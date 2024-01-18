@@ -14,12 +14,15 @@ import (
 
 func newQwenLlm(t *testing.T) *LLM {
 	t.Helper()
-	if dashscopeKey := os.Getenv(dashscopeTokenEnvName); dashscopeKey == "" {
+	dashscopeKey := os.Getenv(dashscopeTokenEnvName)
+	if dashscopeKey == "" {
 		t.Skip("DASHSCOPE_API_KEY not set")
 		return nil
 	}
 	modelOption := WithModel("qwen-turbo")
-	llm, err := New(modelOption)
+	tokenOption := WithToken(dashscopeKey)
+
+	llm, err := New(modelOption, tokenOption)
 	require.NoError(t, err)
 	return llm
 }
@@ -55,7 +58,7 @@ func TestLLmStream(t *testing.T) {
 	assert.Regexp(t, "hello|hi|how|moring|good|today|assist", strings.ToLower(sb.String())) //nolint:all
 }
 
-func TestGenerateContentBasic(t *testing.T) {
+func TestGenerateContentText(t *testing.T) {
 	t.Parallel()
 	llm := newQwenLlm(t)
 
@@ -122,6 +125,16 @@ func TestGenerateContentStream(t *testing.T) {
 
 	assert.Regexp(t, "hello|hi|how|moring|good|today|assist", strings.ToLower(c1.Content))
 	assert.Regexp(t, "hello|hi|how|moring|good|today|assist", strings.ToLower(sb.String()))
+}
+
+func TestGenerateContentImsge(t *testing.T) {
+	t.Parallel()
+	// llm := newQwenLlm(t)
+	// ctx := context.TODO()
+
+	// userContent := llms.TextContent{
+	// 	Text: "greet me in english.",
+	// }
 }
 
 func TestEMbedding(t *testing.T) {

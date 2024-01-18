@@ -3,46 +3,30 @@ package wanxclient
 import (
 	"context"
 	"errors"
-	"os"
 	"time"
 
-	httpclient "github.com/tmc/langchaingo/llms/tongyi/internal/httpclient"
+	httpclient "github.com/tmc/langchaingo/llms/tongyi/internal/tongyiclient/httpclient"
 )
 
 var (
 	ErrEmptyResponse = errors.New("empty response")
 	ErrEmptyTaskID   = errors.New("task id is empty")
 	ErrTaskUnsuccess = errors.New("task is not success")
+	ErrModelNotSet   = errors.New("model is not set")
 )
 
-type WanxClient struct {
-	Model           WanxModel
-	imageGenURL     string
-	taskStatusURLFn func(string) string
-	token           string
-	httpCli         httpclient.IHttpClient
-}
-
-func NewWanxClient(model WanxModel, httpCli httpclient.IHttpClient) *WanxClient {
-	return &WanxClient{
-		Model:           model,
-		imageGenURL:     WanxImageSynthesisURL(),
-		taskStatusURLFn: WanxTaskURL,
-		token:           os.Getenv("DASHSCOPE_API_KEY"),
-		httpCli:         httpCli,
-	}
-}
-
 //nolint:lll
-func (w *WanxClient) CreateImageGeneration(ctx context.Context, payload *WanxImageSynthesisRequest) ([]*WanxImgBlob, error) {
-	resp, err := w.SyncCall(ctx, payload)
+func CreateImageGeneration(ctx context.Context, payload *WanxImageSynthesisRequest, httpcli httpclient.IHttpClient, token string) ([]*WanxImgBlob, error) {
+	// fmt.Println("debug...token: ", token)
+	tokenOpt := httpclient.WithTokenHeaderOption(token)
+	resp, err := SyncCall(ctx, payload, httpcli, tokenOpt)
 	if err != nil {
 		return nil, err
 	}
 
 	blobList := make([]*WanxImgBlob, 0, len(resp.Results))
 	for _, img := range resp.Results {
-		imgByte, err := w.httpCli.GetImage(ctx, img.URL, w.TokenHeaderOption())
+		imgByte, err := httpcli.GetImage(ctx, img.URL, tokenOpt)
 		if err != nil {
 			return nil, err
 		}
@@ -54,8 +38,8 @@ func (w *WanxClient) CreateImageGeneration(ctx context.Context, payload *WanxIma
 }
 
 // tongyi-wanx-api only support AsyncCall, so we need to warp it to be Sync.
-func (w *WanxClient) SyncCall(ctx context.Context, req *WanxImageSynthesisRequest) (*WanxOutput, error) {
-	rsp, err := w.AsyncCall(ctx, req)
+func SyncCall(ctx context.Context, req *WanxImageSynthesisRequest, httpcli httpclient.IHttpClient, options ...httpclient.HTTPOption) (*WanxOutput, error) {
+	rsp, err := AsyncCall(ctx, req, httpcli, options...)
 	if err != nil {
 		return nil, err
 	}
@@ -77,7 +61,7 @@ func (w *WanxClient) SyncCall(ctx context.Context, req *WanxImageSynthesisReques
 		time.Sleep(time.Duration(delayDurationToCheckStatus) * time.Millisecond)
 
 		// log.Println("TaskStatus: ", currentTaskStatus)
-		taskResp, err = w.CheckTaskStatus(ctx, &taskReq)
+		taskResp, err = CheckTaskStatus(ctx, &taskReq, httpcli, options...)
 		if err != nil {
 			return nil, err
 		}
@@ -97,16 +81,17 @@ func (w *WanxClient) SyncCall(ctx context.Context, req *WanxImageSynthesisReques
 }
 
 // calling tongyi-wanx-api to get image-generation async task id.
-func (w *WanxClient) AsyncCall(ctx context.Context, req *WanxImageSynthesisRequest) (*WanxImageResponse, error) {
+func AsyncCall(ctx context.Context, req *WanxImageSynthesisRequest, httpcli httpclient.IHttpClient, options ...httpclient.HTTPOption) (*WanxImageResponse, error) {
 	header := map[string]string{"X-DashScope-Async": "enable"}
 	headerOpt := httpclient.WithHeader(header)
+	options = append(options, headerOpt)
 
 	if req.Model == "" {
-		req.Model = string(w.Model)
+		return nil, ErrModelNotSet
 	}
 
 	resp := WanxImageResponse{}
-	err := w.httpCli.Post(ctx, w.imageGenURL, req, &resp, w.TokenHeaderOption(), headerOpt)
+	err := httpcli.Post(ctx, WanxImageSynthesisURL(), req, &resp, options...)
 	if err != nil {
 		return nil, err
 	}
@@ -114,17 +99,12 @@ func (w *WanxClient) AsyncCall(ctx context.Context, req *WanxImageSynthesisReque
 	return &resp, nil
 }
 
-func (w *WanxClient) CheckTaskStatus(ctx context.Context, req *WanxTaskRequest) (*WanxTaskResponse, error) {
+func CheckTaskStatus(ctx context.Context, req *WanxTaskRequest, httpcli httpclient.IHttpClient, options ...httpclient.HTTPOption) (*WanxTaskResponse, error) {
 	resp := WanxTaskResponse{}
-	err := w.httpCli.Get(ctx, w.taskStatusURLFn(req.TaskID), &resp, w.TokenHeaderOption())
+	err := httpcli.Get(ctx, WanxTaskURL(req.TaskID), &resp, options...)
 	if err != nil {
 		return nil, err
 	}
 
 	return &resp, nil
-}
-
-func (w *WanxClient) TokenHeaderOption() httpclient.HTTPOption {
-	m := map[string]string{"Authorization": "Bearer " + w.token}
-	return httpclient.WithHeader(m)
 }

@@ -2,6 +2,8 @@ package qwenclient
 
 import (
 	"context"
+
+	"github.com/tmc/langchaingo/llms/tongyi/internal/tongyiclient/httpclient"
 )
 
 const (
@@ -36,11 +38,18 @@ type EmbeddingResponse struct {
 	Output EmbeddingOutput `json:"output"`
 }
 
-func (q *QwenClient) createEmbedding(ctx context.Context, req *EmbeddingRequest) (*EmbeddingResponse, error) {
-	headerOpt := q.TokenHeaderOption()
+//nolilnt:lll
+func CreateEmbedding(ctx context.Context, req *EmbeddingRequest, cli httpclient.IHttpClient, token string) (*EmbeddingResponse, error) {
+	if req.Model == "" {
+		req.Model = defaultEmbeddingModel
+	}
+	if req.Params.TextType == "" {
+		req.Params.TextType = "document"
+	}
 
 	resp := EmbeddingResponse{}
-	err := q.httpCli.Post(ctx, embeddingURL, req, &resp, headerOpt)
+	tokenOption := httpclient.WithTokenHeaderOption(token)
+	err := cli.Post(ctx, embeddingURL, req, &resp, tokenOption)
 	if err != nil {
 		return nil, err
 	}

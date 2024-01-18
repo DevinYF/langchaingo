@@ -4,41 +4,19 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"log"
-	"os"
 	"strconv"
 	"strings"
 
-	httpclient "github.com/tmc/langchaingo/llms/tongyi/internal/httpclient"
+	httpclient "github.com/tmc/langchaingo/llms/tongyi/internal/tongyiclient/httpclient"
 )
 
-var ErrEmptyResponse = errors.New("empty response")
-
-type QwenClient struct {
-	Model   QwenModel
-	baseURL string
-	token   string
-	httpCli httpclient.IHttpClient
-}
-
-func NewQwenClient(model string, httpCli httpclient.IHttpClient) *QwenClient {
-	qwenModel := ChoseQwenModel(model)
-
-	return &QwenClient{
-		Model:   qwenModel,
-		baseURL: QwenURL(),
-		token:   os.Getenv("DASHSCOPE_API_KEY"),
-		httpCli: httpCli,
-	}
-}
-
-func (q *QwenClient) parseStreamingChatResponse(ctx context.Context, payload *QwenRequest) (*QwenOutputMessage, error) {
+func AsyncParseStreamingChatResponse(ctx context.Context, payload *QwenRequest, cli httpclient.IHttpClient, token string) (*QwenOutputMessage, error) {
 	if payload.Model == "" {
-		payload.Model = string(q.Model)
+		return nil, ErrModelNotSet
 	}
-	responseChan := q.asyncChatStreaming(ctx, payload)
+	responseChan := asyncChatStreaming(ctx, payload, cli, token)
 	outputMessage := QwenOutputMessage{}
 	for rspData := range responseChan {
 		if rspData.Err != nil {
@@ -71,58 +49,14 @@ func (q *QwenClient) parseStreamingChatResponse(ctx context.Context, payload *Qw
 	return &outputMessage, nil
 }
 
-func (q *QwenClient) CreateCompletion(ctx context.Context, payload *QwenRequest) (*QwenOutputMessage, error) {
-	if payload.Parameters == nil {
-		payload.Parameters = DefaultParameters()
+func SyncCall(ctx context.Context, payload *QwenRequest, cli httpclient.IHttpClient, token string) (*QwenOutputMessage, error) {
+	if payload.Model == "" {
+		return nil, ErrModelNotSet
 	}
-	if payload.StreamingFunc != nil {
-		payload.Parameters.SetIncrementalOutput(true)
-		return q.parseStreamingChatResponse(ctx, payload)
-	}
-	return q.SyncCall(ctx, payload)
-}
-
-func (q *QwenClient) CreateEmbedding(ctx context.Context, r *EmbeddingRequest) ([][]float32, error) {
-	if r.Model == "" {
-		r.Model = defaultEmbeddingModel
-	}
-	if r.Params.TextType == "" {
-		r.Params.TextType = "document"
-	}
-	resp, err := q.createEmbedding(ctx, r)
-	if err != nil {
-		return nil, err
-	}
-	if len(resp.Output.Embeddings) == 0 {
-		return nil, ErrEmptyResponse
-	}
-
-	embeddings := make([][]float32, 0)
-	for i := 0; i < len(resp.Output.Embeddings); i++ {
-		embeddings = append(embeddings, resp.Output.Embeddings[i].Embedding)
-	}
-	return embeddings, nil
-}
-
-func (q *QwenClient) asyncChatStreaming(ctx context.Context, r *QwenRequest) <-chan QwenResponse {
-	chanBuffer := 100
-	_respChunkChannel := make(chan QwenResponse, chanBuffer)
-
-	go func() {
-		withHeader := map[string]string{
-			"Accept": "text/event-stream",
-		}
-
-		q._combineStreamingChunk(ctx, r, withHeader, _respChunkChannel)
-	}()
-	return _respChunkChannel
-}
-
-func (q *QwenClient) SyncCall(ctx context.Context, req *QwenRequest) (*QwenOutputMessage, error) {
-	headerOpt := q.TokenHeaderOption()
 
 	resp := QwenOutputMessage{}
-	err := q.httpCli.Post(ctx, q.baseURL, req, &resp, headerOpt)
+	tokenOpt := httpclient.WithTokenHeaderOption(token)
+	err := cli.Post(ctx, QwenURL(), payload, &resp, tokenOpt)
 	if err != nil {
 		return nil, err
 	}
@@ -132,9 +66,18 @@ func (q *QwenClient) SyncCall(ctx context.Context, req *QwenRequest) (*QwenOutpu
 	return &resp, nil
 }
 
-func (q *QwenClient) TokenHeaderOption() httpclient.HTTPOption {
-	m := map[string]string{"Authorization": "Bearer " + q.token}
-	return httpclient.WithHeader(m)
+func asyncChatStreaming(ctx context.Context, r *QwenRequest, cli httpclient.IHttpClient, token string) <-chan QwenResponse {
+	chanBuffer := 100
+	_respChunkChannel := make(chan QwenResponse, chanBuffer)
+
+	go func() {
+		withHeader := map[string]string{
+			"Accept": "text/event-stream",
+		}
+
+		_combineStreamingChunk(ctx, r, withHeader, _respChunkChannel, cli, token)
+	}()
+	return _respChunkChannel
 }
 
 /*
@@ -143,20 +86,22 @@ func (q *QwenClient) TokenHeaderOption() httpclient.HTTPOption {
  * event: xxxxx
  * ......
  */
-func (q *QwenClient) _combineStreamingChunk(
+func _combineStreamingChunk(
 	ctx context.Context,
 	reqBody *QwenRequest,
 	withHeader map[string]string,
 	_respChunkChannel chan QwenResponse,
+	cli httpclient.IHttpClient,
+	token string,
 ) {
 	defer close(_respChunkChannel)
 	var _rawStreamOutChannel chan string
 
 	var err error
 	headerOpt := httpclient.WithHeader(withHeader)
-	tokenOpt := q.TokenHeaderOption()
+	tokenOpt := httpclient.WithTokenHeaderOption(token)
 
-	_rawStreamOutChannel, err = q.httpCli.PostSSE(ctx, q.baseURL, reqBody, headerOpt, tokenOpt)
+	_rawStreamOutChannel, err = cli.PostSSE(ctx, QwenURL(), reqBody, headerOpt, tokenOpt)
 	if err != nil {
 		_respChunkChannel <- QwenResponse{Err: err}
 		return
@@ -172,7 +117,7 @@ func (q *QwenClient) _combineStreamingChunk(
 			continue
 		}
 
-		err = q.fillInRespData(v, &rsp)
+		err = fillInRespData(v, &rsp)
 		if err != nil {
 			rsp.Err = err
 			_respChunkChannel <- rsp
@@ -182,7 +127,7 @@ func (q *QwenClient) _combineStreamingChunk(
 }
 
 // filled in response data line by line.
-func (q *QwenClient) fillInRespData(line string, output *QwenResponse) error {
+func fillInRespData(line string, output *QwenResponse) error {
 	if strings.TrimSpace(line) == "" {
 		return nil
 	}

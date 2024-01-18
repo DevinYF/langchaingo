@@ -1,4 +1,4 @@
-package qwenclient
+package tongyiclient
 
 import "errors"
 
@@ -14,6 +14,7 @@ func (e *WrapMessageError) Error() string {
 	return e.Message + ": " + e.Cause.Error()
 }
 
-var ErrEmptyResponse = errors.New("empty response")
-
-var ErrModelNotSet = errors.New("model is not set")
+var (
+	ErrModelNotSet   = errors.New("model is not set")
+	ErrEmptyResponse = errors.New("empty response")
+)
