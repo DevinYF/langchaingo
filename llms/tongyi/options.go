@@ -1,14 +1,18 @@
-package qwen
+package tongyi
 
 import (
 	"log"
 	"net/url"
 )
 
+const (
+	dashscopeTokenEnvName = "DASHSCOPE_API_KEY"
+)
+
 type options struct {
 	token        string
-	model        string
 	dashscopeURL *url.URL
+	model        string
 }
 
 type Option func(*options)

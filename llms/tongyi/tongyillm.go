@@ -1,22 +1,25 @@
-package qwen
+package tongyi
 
 import (
 	"context"
-	"encoding/json"
 	"errors"
 	"fmt"
 
+	"github.com/tmc/langchaingo/callbacks"
 	"github.com/tmc/langchaingo/llms"
 	qwen_client "github.com/tmc/langchaingo/llms/tongyi/internal/qwenclient"
+	tongyi_client "github.com/tmc/langchaingo/llms/tongyi/internal/tongyiclient"
 	"github.com/tmc/langchaingo/schema"
 )
 
-var _ llms.Model = (*Chat)(nil)
-
 var (
-	ErrNotSupportImsgePart = errors.New("not support Image parts yet")
-	ErrMultipleTextParts   = errors.New("found multiple text parts in message")
-	ErrEmptyMessageContent = errors.New("TongyiMessageContent is empty")
+	ErrEmptyResponse            = errors.New("no response")
+	ErrMissingToken             = errors.New("missing the Dashscope API key, set it in the DASHSCOPE_API_KEY environment variable")
+	ErrUnexpectedResponseLength = errors.New("unexpected length of response")
+	ErrIncompleteEmbedding      = errors.New("no all input got emmbedded")
+	ErrNotSupportImsgePart      = errors.New("not support Image parts yet")
+	ErrMultipleTextParts        = errors.New("found multiple text parts in message")
+	ErrEmptyMessageContent      = errors.New("TongyiMessageContent is empty")
 )
 
 type UnSupportedRoleError struct {
@@ -27,9 +30,33 @@ func (e *UnSupportedRoleError) Error() string {
 	return fmt.Sprintf("qwen role %s not supported", e.Role)
 }
 
-// GenerateContent implements llms.Model.
+type LLM struct {
+	CallbackHandler callbacks.Handler
+	client          *qwen_client.QwenClient
+	options         options
+}
+
+var _ llms.Model = (*LLM)(nil)
+
+func New(opts ...Option) (*LLM, error) {
+	o := options{}
+	for _, opt := range opts {
+		opt(&o)
+	}
+
+	client := qwen_client.NewQwenClient(o.model, o.token, qwen_client.NewHTTPClient())
+
+	return &LLM{client: client, options: o}, nil
+}
+
+// Call implements llms.LLM.
+func (q *LLM) Call(ctx context.Context, prompt string, options ...llms.CallOption) (string, error) {
+	return llms.CallLLM(ctx, q, prompt, options...)
+}
+
 // nolint:lll
-func (q *Chat) GenerateContent(ctx context.Context, messages []llms.MessageContent, options ...llms.CallOption) (*llms.ContentResponse, error) {
+// GenerateContent implements llms.Model.
+func (q *LLM) GenerateContent(ctx context.Context, messages []llms.MessageContent, options ...llms.CallOption) (*llms.ContentResponse, error) {
 	opts := llms.CallOptions{}
 	for _, opt := range options {
 		opt(&opts)
@@ -43,12 +70,11 @@ func (q *Chat) GenerateContent(ctx context.Context, messages []llms.MessageConte
 	}
 
 	tongyiContents := messagesCntentToQwenMessages(messages)
-	// qwenContents
 	qwenTextMessages := make([]qwen_client.Message, len(tongyiContents))
 	for i, tc := range tongyiContents {
-		qwenTextMessages[i] = *tc.getTextMessage()
+		qwenTextMessages[i] = *tc.GetTextMessage()
 	}
-	rsp, err := q.doTextGenRequest(ctx, model, qwenTextMessages, opts)
+	rsp, err := q.doCompletionRequest(ctx, model, qwenTextMessages, opts)
 	if err != nil {
 		return nil, err
 	}
@@ -69,7 +95,7 @@ func (q *Chat) GenerateContent(ctx context.Context, messages []llms.MessageConte
 	return &llms.ContentResponse{Choices: choices}, nil
 }
 
-func (q *Chat) doTextGenRequest(
+func (q *LLM) doCompletionRequest(
 	ctx context.Context,
 	model string,
 	qwenTextMessages []qwen_client.Message,
@@ -107,31 +133,34 @@ func (q *Chat) doTextGenRequest(
 	return rsp, nil
 }
 
-// qwen message Decorator in order to support llms.MessageContent.
-type TongyiMessageContent struct {
-	TextMessage *qwen_client.Message
-
-	// TODO: intergrate tongyi-wanx and qwen-vl api to support image type
-	// ImageMessage *qwen_client.ImageData
-}
-
-func (q *TongyiMessageContent) getTextMessage() *qwen_client.Message {
-	return q.TextMessage
-}
-
-func (q *TongyiMessageContent) MarshalJSON() ([]byte, error) {
-	if q.TextMessage != nil {
-		return json.Marshal(q.TextMessage)
+func (q *LLM) CreateEmbedding(ctx context.Context, inputTexts []string) ([][]float32, error) {
+	input := struct {
+		Texts []string `json:"texts"`
+	}{
+		Texts: inputTexts,
 	}
-	return nil, ErrEmptyMessageContent
+	embeddings, err := q.client.CreateEmbedding(ctx,
+		&qwen_client.EmbeddingRequest{
+			Input: input,
+		},
+	)
+	if err != nil {
+		return nil, err
+	}
+
+	if len(embeddings) != len(inputTexts) {
+		return nil, ErrIncompleteEmbedding
+	}
+
+	return embeddings, nil
 }
 
-func messagesCntentToQwenMessages(messagesContent []llms.MessageContent) []TongyiMessageContent {
-	qwenMessages := make([]TongyiMessageContent, len(messagesContent))
+func messagesCntentToQwenMessages(messagesContent []llms.MessageContent) []tongyi_client.TongyiMessageContent {
+	qwenMessages := make([]tongyi_client.TongyiMessageContent, len(messagesContent))
 
 	for i, mc := range messagesContent {
 		foundText := false
-		qmsg := TongyiMessageContent{}
+		qmsg := tongyi_client.TongyiMessageContent{}
 		for _, p := range mc.Parts {
 			switch pt := p.(type) {
 			case llms.TextContent:

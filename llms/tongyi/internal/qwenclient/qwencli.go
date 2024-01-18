@@ -7,7 +7,6 @@ import (
 	"errors"
 	"fmt"
 	"log"
-	"os"
 	"strconv"
 	"strings"
 )
@@ -21,13 +20,13 @@ type QwenClient struct {
 	httpCli IHttpClient
 }
 
-func NewQwenClient(model string, httpCli IHttpClient) *QwenClient {
+func NewQwenClient(model string, token string, httpCli IHttpClient) *QwenClient {
 	qwenModel := ChoseQwenModel(model)
 
 	return &QwenClient{
 		Model:   qwenModel,
 		baseURL: QwenDashscopeURL,
-		token:   os.Getenv("DASHSCOPE_API_KEY"),
+		token:   token,
 		httpCli: httpCli,
 	}
 }

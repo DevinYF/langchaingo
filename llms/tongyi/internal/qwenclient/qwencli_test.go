@@ -2,6 +2,7 @@ package qwenclient
 
 import (
 	"context"
+	"os"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -11,7 +12,8 @@ import (
 
 func newQwenClient(t *testing.T, model string) *QwenClient {
 	t.Helper()
-	cli := NewQwenClient(model, NewHTTPClient())
+	token := os.Getenv("DASHSCOPE_API_KEY")
+	cli := NewQwenClient(model, token, NewHTTPClient())
 	if cli.token == "" {
 		t.Skip("token is empty")
 	}
@@ -22,9 +24,10 @@ func newMockClient(t *testing.T, model string, ctrl *gomock.Controller, f mockFn
 	t.Helper()
 
 	mockHTTPCli := NewMockIHttpClient(ctrl)
+	mockAPikey := ""
 	f(mockHTTPCli)
 
-	qwenCli := NewQwenClient(model, mockHTTPCli)
+	qwenCli := NewQwenClient(model, mockAPikey, mockHTTPCli)
 	return qwenCli
 }
 
