@@ -5,6 +5,7 @@ import (
 
 	"github.com/tmc/langchaingo/callbacks"
 	"github.com/tmc/langchaingo/llms"
+	tongyi_http "github.com/tmc/langchaingo/llms/tongyi/internal/httpclient"
 	qwen_client "github.com/tmc/langchaingo/llms/tongyi/internal/qwenclient"
 	"github.com/tmc/langchaingo/schema"
 )
@@ -23,7 +24,7 @@ func NewChat(opts ...Option) (*Chat, error) {
 		opt(&o)
 	}
 
-	client := qwen_client.NewQwenClient(o.model, qwen_client.NewHTTPClient())
+	client := qwen_client.NewQwenClient(o.model, tongyi_http.NewHTTPClient())
 
 	return &Chat{client: client, options: o}, nil
 }

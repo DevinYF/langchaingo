@@ -10,6 +10,8 @@ import (
 	"os"
 	"strconv"
 	"strings"
+
+	httpclient "github.com/tmc/langchaingo/llms/tongyi/internal/httpclient"
 )
 
 var ErrEmptyResponse = errors.New("empty response")
@@ -18,10 +20,10 @@ type QwenClient struct {
 	Model   QwenModel
 	baseURL string
 	token   string
-	httpCli IHttpClient
+	httpCli httpclient.IHttpClient
 }
 
-func NewQwenClient(model string, httpCli IHttpClient) *QwenClient {
+func NewQwenClient(model string, httpCli httpclient.IHttpClient) *QwenClient {
 	qwenModel := ChoseQwenModel(model)
 
 	return &QwenClient{
@@ -40,7 +42,7 @@ func (q *QwenClient) parseStreamingChatResponse(ctx context.Context, payload *Qw
 	outputMessage := QwenOutputMessage{}
 	for rspData := range responseChan {
 		if rspData.Err != nil {
-			return nil, &DashscopeError{Message: "parseStreamingChatResponse failed", Cause: rspData.Err}
+			return nil, &httpclient.HTTPRequestError{Message: "parseStreamingChatResponse failed", Cause: rspData.Err}
 		}
 		if len(rspData.Output.Output.Choices) == 0 {
 			return nil, ErrEmptyResponse
@@ -51,7 +53,7 @@ func (q *QwenClient) parseStreamingChatResponse(ctx context.Context, payload *Qw
 		if payload.StreamingFunc != nil {
 			err := payload.StreamingFunc(ctx, chunk)
 			if err != nil {
-				return nil, &DashscopeError{Message: "parseStreamingChatResponse failed", Cause: err}
+				return nil, &httpclient.HTTPRequestError{Message: "parseStreamingChatResponse failed", Cause: err}
 			}
 		}
 
@@ -130,10 +132,9 @@ func (q *QwenClient) SyncCall(ctx context.Context, req *QwenRequest) (*QwenOutpu
 	return &resp, nil
 }
 
-func (q *QwenClient) TokenHeaderOption() HTTPOption {
-	return func(c *HTTPCli) {
-		c.req.Header.Set("Authorization", "Bearer "+q.token)
-	}
+func (q *QwenClient) TokenHeaderOption() httpclient.HTTPOption {
+	m := map[string]string{"Authorization": "Bearer " + q.token}
+	return httpclient.WithHeader(m)
 }
 
 /*
@@ -152,7 +153,7 @@ func (q *QwenClient) _combineStreamingChunk(
 	var _rawStreamOutChannel chan string
 
 	var err error
-	headerOpt := WithHeader(withHeader)
+	headerOpt := httpclient.WithHeader(withHeader)
 	tokenOpt := q.TokenHeaderOption()
 
 	_rawStreamOutChannel, err = q.httpCli.PostSSE(ctx, q.baseURL, reqBody, headerOpt, tokenOpt)

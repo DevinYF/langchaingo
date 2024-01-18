@@ -1,10 +1,12 @@
-package qwenclient
+package httpclient
 
 import (
 	"bufio"
 	"bytes"
 	"context"
 	"encoding/json"
+	"image"
+	"image/png"
 	"io"
 	"net/http"
 	"os/exec"
@@ -13,10 +15,12 @@ import (
 
 type HTTPOption func(c *HTTPCli)
 
-// unit test: mockgen -destination=http_client_mock.go -package=qwen_client . IHttpClient.
+//go:generate mockgen -destination=http_client_mock.go -package=httpclient . IHttpClient
 type IHttpClient interface {
 	PostSSE(ctx context.Context, urll string, reqbody interface{}, options ...HTTPOption) (chan string, error)
 	Post(ctx context.Context, urll string, reqbody interface{}, resp interface{}, options ...HTTPOption) error
+	Get(ctx context.Context, urll string, resp interface{}, options ...HTTPOption) error
+	GetImage(ctx context.Context, imgURL string, options ...HTTPOption) ([]byte, error)
 }
 
 type HTTPCli struct {
@@ -53,6 +57,46 @@ func withStream() HTTPOption {
 	return func(c *HTTPCli) {
 		c.req.Header.Set("Accept", "text/event-stream")
 	}
+}
+
+func (c *HTTPCli) Get(ctx context.Context, imgURL string, respbody interface{}, options ...HTTPOption) error {
+	resp, err := c.httpInner(ctx, "GET", imgURL, nil, options...)
+	if err != nil {
+		return err
+	}
+	defer resp.Body.Close()
+	result, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return err
+	}
+
+	err = json.Unmarshal(result, &respbody)
+	if err != nil {
+		return &WrapMessageError{Message: "Unmarshal Json failed", Cause: err}
+	}
+
+	return nil
+}
+
+func (c *HTTPCli) GetImage(ctx context.Context, imgURL string, options ...HTTPOption) ([]byte, error) {
+	resp, err := c.httpInner(ctx, "GET", imgURL, nil, options...)
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+
+	img, _, err := image.Decode(resp.Body)
+	if err != nil {
+		return nil, &WrapMessageError{Message: "Decode image failed", Cause: err}
+	}
+
+	buf := new(bytes.Buffer)
+	err = png.Encode(buf, img)
+	if err != nil {
+		return nil, &WrapMessageError{Message: "Encode image topng failed", Cause: err}
+	}
+
+	return buf.Bytes(), nil
 }
 
 // nolint:lll
@@ -128,21 +172,21 @@ func (c *HTTPCli) Post(ctx context.Context, urll string, reqbody interface{}, re
 }
 
 func (c *HTTPCli) EncodeJSONBody(body interface{}) ([]byte, error) {
-	var err error
-
-	var bodyJSON []byte
 	if body != nil {
+		var bodyJSON []byte
 		switch body := body.(type) {
 		case []byte:
 			bodyJSON = body
 		default:
+			var err error
 			bodyJSON, err = json.Marshal(body)
 			if err != nil {
 				return nil, err
 			}
 		}
+		return bodyJSON, nil
 	}
-	return bodyJSON, nil
+	return nil, nil
 }
 
 // nolint:lll
@@ -175,7 +219,7 @@ func (c *HTTPCli) httpInner(ctx context.Context, method, url string, body interf
 			return resp, err
 		}
 
-		err = &DashscopeError{Message: "request Failed: " + string(result), Code: resp.StatusCode}
+		err = &HTTPRequestError{Message: "request Failed: " + string(result), Code: resp.StatusCode}
 		return resp, err
 	}
 

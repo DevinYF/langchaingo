@@ -6,12 +6,13 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	httpclient "github.com/tmc/langchaingo/llms/tongyi/internal/httpclient"
 	"go.uber.org/mock/gomock"
 )
 
 func newQwenClient(t *testing.T, model string) *QwenClient {
 	t.Helper()
-	cli := NewQwenClient(model, NewHTTPClient())
+	cli := NewQwenClient(model, httpclient.NewHTTPClient())
 	if cli.token == "" {
 		t.Skip("token is empty")
 	}
@@ -21,14 +22,14 @@ func newQwenClient(t *testing.T, model string) *QwenClient {
 func newMockClient(t *testing.T, model string, ctrl *gomock.Controller, f mockFn) *QwenClient {
 	t.Helper()
 
-	mockHTTPCli := NewMockIHttpClient(ctrl)
+	mockHTTPCli := httpclient.NewMockIHttpClient(ctrl)
 	f(mockHTTPCli)
 
 	qwenCli := NewQwenClient(model, mockHTTPCli)
 	return qwenCli
 }
 
-type mockFn func(mockHTTPCli *MockIHttpClient)
+type mockFn func(mockHTTPCli *httpclient.MockIHttpClient)
 
 func TestStreamingChunk(t *testing.T) {
 	t.Parallel()
@@ -114,7 +115,7 @@ func TestMockBasic(t *testing.T) {
 	assert.Equal(t, 15, resp.Usage.TotalTokens)
 }
 
-func _mockAsyncFunc(mockHTTPCli *MockIHttpClient) {
+func _mockAsyncFunc(mockHTTPCli *httpclient.MockIHttpClient) {
 	MockStreamData := []string{
 		`id:1`,
 		`event:result`,
@@ -194,7 +195,7 @@ func _mockAsyncFunc(mockHTTPCli *MockIHttpClient) {
 	}()
 }
 
-func _mockSyncFunc(mockHTTPCli *MockIHttpClient) {
+func _mockSyncFunc(mockHTTPCli *httpclient.MockIHttpClient) {
 	ctx := context.TODO()
 
 	mockResp := QwenOutputMessage{
