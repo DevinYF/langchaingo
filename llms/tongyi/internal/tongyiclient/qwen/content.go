@@ -73,7 +73,6 @@ func (vlist *VLContentList) SetText(s string) {
 	if vlist == nil {
 		panic("VLContentList is nil")
 	}
-	// (*vlist)[0].Text = s
 	*vlist = append(*vlist, VLContent{Text: s})
 }
 
@@ -81,7 +80,6 @@ func (vlist *VLContentList) SetImage(url string) {
 	if vlist == nil {
 		panic("VLContentList is nil or empty")
 	}
-	// (*vlist)[0].Image = s
 	*vlist = append(*vlist, VLContent{Image: url})
 }
 

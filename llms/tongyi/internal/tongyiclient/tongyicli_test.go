@@ -2,7 +2,6 @@ package tongyiclient
 
 import (
 	"context"
-	"fmt"
 	"os"
 	"strings"
 	"testing"
@@ -63,8 +62,6 @@ func TestBasic(t *testing.T) {
 	resp, err := cli.CreateCompletion(ctx, req)
 
 	require.NoError(t, err)
-	fmt.Println("--> resp: ", len(resp.Output.Choices))
-	fmt.Println("--> resp: ", resp.Output.Choices[0].Message.Content.ToString())
 	assert.Regexp(t, "hello|hi|how|assist", resp.Output.Choices[0].Message.Content.ToString())
 }
 

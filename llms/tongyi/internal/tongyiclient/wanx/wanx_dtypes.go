@@ -1,19 +1,23 @@
 package wanx
 
 type WanxImageSynthesisParams struct {
-	// The style of the output image, currently supports the following style values:
-	// "<auto>" default,
-	// "<3d cartoon>" 3D cartoon,
-	// "<anime>" animation,
-	// "<oil painting>" oil painting,
-	// "<watercolor>" watercolor,
-	// "<sketch>" sketch,
-	// "<chinese painting>" Chinese painting,
-	// "<flat illustration>" flat illustration,
+	/*
+	  The style of the output image, currently supports the following style values:
+	  "<auto>" default,
+	  "<3d cartoon>" 3D cartoon,
+	  "<anime>" animation,
+	  "<oil painting>" oil painting,
+	  "<watercolor>" watercolor,
+	  "<sketch>" sketch,
+	  "<chinese painting>" Chinese painting,
+	  "<flat illustration>" flat illustration,
+	*/
 	Style string `json:"style,omitempty"`
-	// The resolution of the generated image,
-	// currently only supports '1024*1024', '720*1280', '1280*720' three resolutions,
-	// default is 1024*1024 pixels.
+	/*
+	  The resolution of the generated image,
+	  currently only supports '1024*1024', '720*1280', '1280*720' three resolutions,
+	  default is 1024*1024 pixels.
+	*/
 	Size string `json:"size,omitempty"`
 	// The number of images generated, currently supports 1~4, default is 1.
 	N int `json:"n,omitempty"`

@@ -35,7 +35,6 @@ func (e *UnSupportedRoleError) Error() string {
 
 type LLM struct {
 	CallbackHandler callbacks.Handler
-	// client          *qwen_client.QwenClient
 	client  *tongyiclient.TongyiClient
 	options options
 }
@@ -82,7 +81,6 @@ func (q *LLM) GenerateContent(ctx context.Context, messages []llms.MessageConten
 
 func (q *LLM) doCompletionRequest(
 	ctx context.Context,
-	// tongyiMessage []tongyiclient.TongyiMessageContent,
 	messages []llms.MessageContent,
 	opts llms.CallOptions,
 ) ([]*llms.ContentChoice, error) {
@@ -154,7 +152,6 @@ func messagesCntentToQwenMessages(messagesContent []llms.MessageContent) []tongy
 	for i, mc := range messagesContent {
 		foundText := false
 
-		// qmsg := tongyiclient.TongyiMessageContent{}
 		qmsg := tongyiclient.NewTextMessage(typeToQwenRole(mc.Role))
 		for _, p := range mc.Parts {
 			switch pt := p.(type) {
@@ -166,11 +163,6 @@ func messagesCntentToQwenMessages(messagesContent []llms.MessageContent) []tongy
 					panic(ErrMultipleTextParts)
 				}
 				foundText = true
-			// case llms.ImageURLContent:
-			// 	// qmsg.VLMessage
-			// 	panic(ErrNotImplemented)
-			// case llms.BinaryContent:
-			// 	panic(ErrNotImplemented)
 			default:
 				panic("only support Text parts right now")
 			}
@@ -181,11 +173,9 @@ func messagesCntentToQwenMessages(messagesContent []llms.MessageContent) []tongy
 	return qwenMessages
 }
 
-// func messageConventToQwenVLMessage(messagesContent []llms.MessageContent) []tongyiclient.TongyiMessageContent {
 func messageConventToQwenVLMessage(messagesContent []llms.MessageContent) []tongyiclient.VLMessage {
 	qwenMessages := make([]tongyiclient.VLMessage, len(messagesContent))
 	for i, mc := range messagesContent {
-		// qmsg := tongyiclient.VLMessage{}
 		qmsg := tongyiclient.NewVLMessage(typeToQwenRole(mc.Role))
 
 		foundText := false

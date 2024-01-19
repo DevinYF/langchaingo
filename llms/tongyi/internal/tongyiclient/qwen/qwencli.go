@@ -59,7 +59,6 @@ func SyncCall[T IQwenContent](ctx context.Context, payload *QwenRequest[T], cli 
 
 	// FIXME: 临时处理，后续需要统一
 	url := payload.Input.Messages[0].Content.TargetURL()
-	fmt.Println("-->>> url: ", url)
 	err := cli.Post(ctx, url, payload, &resp, tokenOpt)
 	if err != nil {
 		return nil, err
@@ -107,7 +106,6 @@ func _combineStreamingChunk[T IQwenContent](
 
 	// FIXME: 临时处理，后续需要统一
 	url := payload.Input.Messages[0].Content.TargetURL()
-	fmt.Println("-->>> url: ", url)
 	_rawStreamOutChannel, err = cli.PostSSE(ctx, url, payload, headerOpt, tokenOpt)
 
 	if err != nil {

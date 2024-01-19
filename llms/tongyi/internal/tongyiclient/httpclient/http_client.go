@@ -8,7 +8,6 @@ import (
 	"image"
 	"image/png"
 	"io"
-	"log"
 	"net/http"
 	"os/exec"
 	"time"
@@ -173,8 +172,6 @@ func (c *HTTPCli) EncodeJSONBody(body interface{}) ([]byte, error) {
 // nolint:lll
 func (c *HTTPCli) httpInner(ctx context.Context, method, url string, body interface{}, options ...HTTPOption) (*http.Response, error) {
 	var err error
-
-	log.Printf("debug.. body: %+v\n", body)
 
 	bodyJSON, err := c.EncodeJSONBody(body)
 	if err != nil {

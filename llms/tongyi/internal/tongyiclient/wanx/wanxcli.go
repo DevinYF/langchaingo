@@ -17,7 +17,6 @@ var (
 
 //nolint:lll
 func CreateImageGeneration(ctx context.Context, payload *WanxImageSynthesisRequest, httpcli httpclient.IHttpClient, token string) ([]*WanxImgBlob, error) {
-	// fmt.Println("debug...token: ", token)
 	tokenOpt := httpclient.WithTokenHeaderOption(token)
 	resp, err := SyncCall(ctx, payload, httpcli, tokenOpt)
 	if err != nil {

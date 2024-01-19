@@ -2,7 +2,6 @@ package tongyi
 
 import (
 	"context"
-	"fmt"
 	"os"
 	"strings"
 	"testing"
@@ -82,10 +81,7 @@ func TestVLStreamChund(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, output.String(), resp.Choices[0].Content)
 
-	fmt.Println("->>> ", output.String())
-
 	assert.Regexp(t, "dog|person|individual|woman|girl", strings.ToLower(resp.Choices[0].Content))
-
 }
 
 func TestLLmBasic(t *testing.T) {
