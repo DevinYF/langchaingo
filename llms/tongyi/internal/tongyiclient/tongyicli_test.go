@@ -2,12 +2,16 @@ package tongyiclient
 
 import (
 	"context"
+	"fmt"
 	"os"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	httpclient "github.com/tmc/langchaingo/llms/tongyi/internal/tongyiclient/httpclient"
+
+	// TODO: 不要暴露内部的具体类型
+	qwen "github.com/tmc/langchaingo/llms/tongyi/internal/tongyiclient/qwen"
 	wanx "github.com/tmc/langchaingo/llms/tongyi/internal/tongyiclient/wanx"
 	"go.uber.org/mock/gomock"
 )
@@ -43,9 +47,10 @@ func TestBasic(t *testing.T) {
 
 	cli := newTongyiClient(t, "")
 
+	text := qwen.TextContent("Hello")
 	input := TextInput{
 		Messages: []TextMessage{
-			{Role: "user", Content: "Hello!"},
+			{Role: "user", Content: &text},
 		},
 	}
 
@@ -56,8 +61,9 @@ func TestBasic(t *testing.T) {
 
 	resp, err := cli.CreateCompletion(ctx, req)
 
+	fmt.Println("--> resp: ", resp.Output.Choices[0].Message.Content.ToString())
 	require.NoError(t, err)
-	assert.Regexp(t, "hello|hi|how|assist", resp.Output.Choices[0].Message.Content)
+	assert.Regexp(t, "hello|hi|how|assist", resp.Output.Choices[0].Message.Content.ToString())
 }
 
 func TestStreamingChunk(t *testing.T) {
@@ -66,27 +72,114 @@ func TestStreamingChunk(t *testing.T) {
 
 	cli := newTongyiClient(t, "qwen-turbo")
 
-	output := ""
-
+	content := qwen.TextContent("Hello")
 	input := TextInput{
 		Messages: []TextMessage{
-			{Role: "user", Content: "Hello!"},
+			{Role: "user", Content: &content},
 		},
+	}
+
+	output := ""
+	streamCallbackFn := func(ctx context.Context, chunk []byte) error {
+		output += string(chunk)
+		return nil
 	}
 
 	req := &TextQwenRequest{
 		// Model: "qwen-turbo",
-		Input: input,
-		StreamingFunc: func(ctx context.Context, chunk []byte) error {
-			output += string(chunk)
-			return nil
-		},
+		Input:         input,
+		StreamingFunc: streamCallbackFn,
 	}
 	resp, err := cli.CreateCompletion(ctx, req)
 
 	require.NoError(t, err)
-	assert.Regexp(t, "hello|hi|how|assist", resp.Output.Choices[0].Message.Content)
+	assert.Regexp(t, "hello|hi|how|assist", resp.Output.Choices[0].Message.Content.ToString())
 	assert.Regexp(t, "hello|hi|how|assist", output)
+}
+
+func TestVLBasic(t *testing.T) {
+	t.Parallel()
+	ctx := context.TODO()
+
+	cli := newTongyiClient(t, "")
+
+	sysContent := qwen.VLContentList{
+		{
+			Text: "You are a helpful assistant.",
+		},
+	}
+	userContent := qwen.VLContentList{
+		{
+			Text: "describe the image",
+		},
+		{
+			Image: "https://dashscope.oss-cn-beijing.aliyuncs.com/images/dog_and_girl.jpeg",
+		},
+	}
+
+	input := VLInput{
+		Messages: []VLMessage{
+			{Role: "system", Content: &sysContent},
+			{Role: "user", Content: &userContent},
+		},
+	}
+
+	req := &VLQwenRequest{
+		Model: "qwen-vl-plus",
+		Input: input,
+	}
+
+	resp, err := cli.CreateVLCompletion(ctx, req)
+
+	require.NoError(t, err)
+	assert.Regexp(t, "dog|person|individual|woman|girl", resp.Output.Choices[0].Message.Content.ToString())
+
+}
+
+func TestVLStreamChund(t *testing.T) {
+	t.Parallel()
+	ctx := context.TODO()
+
+	cli := newTongyiClient(t, "")
+
+	sysContent := qwen.VLContentList{
+		{
+			Text: "You are a helpful assistant.",
+		},
+	}
+	userContent := qwen.VLContentList{
+		{
+			Text: "describe the image",
+		},
+		{
+			Image: "https://dashscope.oss-cn-beijing.aliyuncs.com/images/dog_and_girl.jpeg",
+		},
+	}
+
+	input := VLInput{
+		Messages: []VLMessage{
+			{Role: "system", Content: &sysContent},
+			{Role: "user", Content: &userContent},
+		},
+	}
+
+	output := ""
+	streamCallbackFn := func(ctx context.Context, chunk []byte) error {
+		output += string(chunk)
+		return nil
+	}
+
+	req := &VLQwenRequest{
+		Model:         "qwen-vl-plus",
+		Input:         input,
+		StreamingFunc: streamCallbackFn,
+	}
+
+	resp, err := cli.CreateVLCompletion(ctx, req)
+
+	require.NoError(t, err)
+	assert.Regexp(t, "dog|person|individual|woman|girl", resp.Output.Choices[0].Message.Content.ToString())
+	assert.Regexp(t, "dog|person|individual|woman|girl", output)
 }
 
 func TestImageGeneration(t *testing.T) {
@@ -123,10 +216,10 @@ func TestMockStreamingChunk(t *testing.T) {
 	cli := newMockClient(t, "qwen-turbo", ctrl, _mockAsyncFunc)
 
 	output := ""
-
+	text := qwen.TextContent("Hello")
 	input := TextInput{
 		Messages: []TextMessage{
-			{Role: "user", Content: "Hello!"},
+			{Role: "user", Content: &text},
 		},
 	}
 
@@ -141,7 +234,7 @@ func TestMockStreamingChunk(t *testing.T) {
 
 	require.NoError(t, err)
 
-	assert.Equal(t, "Hello! How can I assist you today?", resp.Output.Choices[0].Message.Content)
+	assert.Equal(t, "Hello! How can I assist you today?", resp.Output.Choices[0].Message.Content.ToString())
 	assert.Equal(t, "Hello! How can I assist you today?", output)
 }
 
@@ -151,9 +244,10 @@ func TestMockBasic(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 	cli := newMockClient(t, "qwen-turbo", ctrl, _mockSyncFunc)
+	text := qwen.TextContent("Hello")
 	input := TextInput{
 		Messages: []TextMessage{
-			{Role: "user", Content: "Hello!"},
+			{Role: "user", Content: &text},
 		},
 	}
 
@@ -165,7 +259,7 @@ func TestMockBasic(t *testing.T) {
 
 	require.NoError(t, err)
 
-	assert.Equal(t, "Hello! This is a mock message.", resp.Output.Choices[0].Message.Content)
+	assert.Equal(t, "Hello! This is a mock message.", resp.Output.Choices[0].Message.Content.ToString())
 	assert.Equal(t, "mock-ac55-9fd3-8326-8415cbdf5683", resp.RequestID)
 	assert.Equal(t, 15, resp.Usage.TotalTokens)
 }
@@ -253,15 +347,14 @@ func _mockAsyncFunc(mockHTTPCli *httpclient.MockIHttpClient) {
 func _mockSyncFunc(mockHTTPCli *httpclient.MockIHttpClient) {
 	ctx := context.TODO()
 
+	text := qwen.TextContent("Hello! This is a mock message.")
+
 	mockResp := TextQwenOutputMessage{
 		Output: TextQwenOutput{
-			Choices: []struct {
-				Message      TextMessage `json:"message"`
-				FinishReason string      `json:"finish_reason"`
-			}{
+			Choices: []qwen.Choice[*qwen.TextContent]{
 				{
 					Message: TextMessage{
-						Content: "Hello! This is a mock message.",
+						Content: &text,
 						Role:    "assistant",
 					},
 					FinishReason: "stop",

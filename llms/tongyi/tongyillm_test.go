@@ -127,15 +127,15 @@ func TestGenerateContentStream(t *testing.T) {
 	assert.Regexp(t, "hello|hi|how|moring|good|today|assist", strings.ToLower(sb.String()))
 }
 
-func TestGenerateContentImsge(t *testing.T) {
-	t.Parallel()
-	// llm := newQwenLlm(t)
-	// ctx := context.TODO()
+// func TestGenerateContentImsge(t *testing.T) {
+// 	t.Parallel()
+// 	// llm := newQwenLlm(t)
+// 	// ctx := context.TODO()
 
-	// userContent := llms.TextContent{
-	// 	Text: "greet me in english.",
-	// }
-}
+// 	// userContent := llms.TextContent{
+// 	// 	Text: "greet me in english.",
+// 	// }
+// }
 
 func TestEMbedding(t *testing.T) {
 	t.Parallel()

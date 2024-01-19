@@ -137,9 +137,10 @@ func messagesCntentToQwenMessages(messagesContent []llms.MessageContent) []tongy
 			switch pt := p.(type) {
 			case llms.TextContent:
 				qmsg.TextMessage = &tongyi_client.TextMessage{
-					Role:    typeToQwenRole(mc.Role),
-					Content: pt.Text,
+					Role: typeToQwenRole(mc.Role),
+					// Content: pt.Text,
 				}
+				qmsg.TextMessage.Content.SetText(pt.Text)
 				if foundText {
 					panic(ErrMultipleTextParts)
 				}
@@ -219,7 +220,7 @@ func (q *LLM) createTextResult(textResponse *tongyi_client.TextQwenOutputMessage
 	choices := make([]*llms.ContentChoice, len(textResponse.Output.Choices))
 	for i, c := range textResponse.Output.Choices {
 		choices[i] = &llms.ContentChoice{
-			Content:    c.Message.Content,
+			Content:    c.Message.Content.ToString(),
 			StopReason: c.FinishReason,
 			GenerationInfo: map[string]any{
 				"PromptTokens":     textResponse.Usage.InputTokens,

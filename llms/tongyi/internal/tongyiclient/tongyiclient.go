@@ -28,21 +28,38 @@ func newTongyiCLientWithHttpCli(model string, token string, httpcli httpclient.I
 	}
 }
 
-func (q *TongyiClient) CreateCompletion(ctx context.Context, payload *qwen.QwenRequest) (*qwen.QwenOutputMessage, error) {
+func (q *TongyiClient) CreateCompletion(ctx context.Context, payload *qwen.QwenRequest[*qwen.TextContent]) (*TextQwenOutputMessage, error) {
 	if payload.Model == "" {
-		if q.Model == "" {
-			return nil, ErrModelNotSet
-		}
 		payload.Model = q.Model
 	}
 	if payload.Parameters == nil {
 		payload.Parameters = qwen.DefaultParameters()
 	}
+	return genericCompletion(ctx, payload, q.httpCli, q.token)
+}
+
+func (q *TongyiClient) CreateVLCompletion(ctx context.Context, payload *qwen.QwenRequest[*qwen.VLContentList]) (*VLQwenOutputMessage, error) {
+	if payload.Model == "" {
+		payload.Model = q.Model
+	}
+
+	if payload.Parameters == nil {
+		payload.Parameters = &qwen.Parameters{}
+	}
+
+	return genericCompletion(ctx, payload, q.httpCli, q.token)
+}
+
+func genericCompletion[T qwen.IQwenContent](ctx context.Context, payload *qwen.QwenRequest[T], httpcli httpclient.IHttpClient, token string) (*qwen.QwenOutputMessage[T], error) {
+	if payload.Model == "" {
+		return nil, ErrModelNotSet
+	}
+
 	if payload.StreamingFunc != nil {
 		payload.Parameters.SetIncrementalOutput(true)
-		return qwen.AsyncParseStreamingChatResponse(ctx, payload, q.httpCli, q.token)
+		return qwen.AsyncParseStreamingChatResponse(ctx, payload, httpcli, token)
 	}
-	return qwen.SyncCall(ctx, payload, q.httpCli, q.token)
+	return qwen.SyncCall(ctx, payload, httpcli, token)
 }
 
 func (q *TongyiClient) CreateImageGeneration(ctx context.Context, payload *wanx.WanxImageSynthesisRequest) ([]*wanx.WanxImgBlob, error) {
