@@ -1,4 +1,4 @@
-package wanxclient
+package wanx
 
 type WanxImageSynthesisParams struct {
 	// The style of the output image, currently supports the following style values:

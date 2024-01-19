@@ -1,4 +1,4 @@
-package qwenclient
+package qwen
 
 import (
 	"bytes"
@@ -12,12 +12,12 @@ import (
 	httpclient "github.com/tmc/langchaingo/llms/tongyi/internal/tongyiclient/httpclient"
 )
 
-func AsyncParseStreamingChatResponse[T IQwenContent](ctx context.Context, payload *QwenRequest[T], cli httpclient.IHttpClient, token string) (*QwenOutputMessage[T], error) {
+func AsyncParseStreamingChatResponse[T IQwenContent](ctx context.Context, payload *QwenRequest[T], cli httpclient.IHttpClient, token string) (*QwenOutputResponse[T], error) {
 	if payload.Model == "" {
 		return nil, ErrModelNotSet
 	}
 	responseChan := asyncChatStreaming(ctx, payload, cli, token)
-	outputMessage := QwenOutputMessage[T]{}
+	outputMessage := QwenOutputResponse[T]{}
 	for rspData := range responseChan {
 		if rspData.Err != nil {
 			return nil, &httpclient.HTTPRequestError{Message: "parseStreamingChatResponse failed", Cause: rspData.Err}
@@ -49,12 +49,12 @@ func AsyncParseStreamingChatResponse[T IQwenContent](ctx context.Context, payloa
 	return &outputMessage, nil
 }
 
-func SyncCall[T IQwenContent](ctx context.Context, payload *QwenRequest[T], cli httpclient.IHttpClient, token string) (*QwenOutputMessage[T], error) {
+func SyncCall[T IQwenContent](ctx context.Context, payload *QwenRequest[T], cli httpclient.IHttpClient, token string) (*QwenOutputResponse[T], error) {
 	if payload.Model == "" {
 		return nil, ErrModelNotSet
 	}
 
-	resp := QwenOutputMessage[T]{}
+	resp := QwenOutputResponse[T]{}
 	tokenOpt := httpclient.WithTokenHeaderOption(token)
 
 	// FIXME: 临时处理，后续需要统一
@@ -70,9 +70,9 @@ func SyncCall[T IQwenContent](ctx context.Context, payload *QwenRequest[T], cli 
 	return &resp, nil
 }
 
-func asyncChatStreaming[T IQwenContent](ctx context.Context, r *QwenRequest[T], cli httpclient.IHttpClient, token string) <-chan QwenResponse[T] {
+func asyncChatStreaming[T IQwenContent](ctx context.Context, r *QwenRequest[T], cli httpclient.IHttpClient, token string) <-chan QwenStreamOutput[T] {
 	chanBuffer := 100
-	_respChunkChannel := make(chan QwenResponse[T], chanBuffer)
+	_respChunkChannel := make(chan QwenStreamOutput[T], chanBuffer)
 
 	go func() {
 		withHeader := map[string]string{
@@ -94,7 +94,7 @@ func _combineStreamingChunk[T IQwenContent](
 	ctx context.Context,
 	payload *QwenRequest[T],
 	withHeader map[string]string,
-	_respChunkChannel chan QwenResponse[T],
+	_respChunkChannel chan QwenStreamOutput[T],
 	cli httpclient.IHttpClient,
 	token string,
 ) {
@@ -111,17 +111,17 @@ func _combineStreamingChunk[T IQwenContent](
 	_rawStreamOutChannel, err = cli.PostSSE(ctx, url, payload, headerOpt, tokenOpt)
 
 	if err != nil {
-		_respChunkChannel <- QwenResponse[T]{Err: err}
+		_respChunkChannel <- QwenStreamOutput[T]{Err: err}
 		return
 	}
 
-	rsp := QwenResponse[T]{}
+	rsp := QwenStreamOutput[T]{}
 
 	for v := range _rawStreamOutChannel {
 		if strings.TrimSpace(v) == "" {
 			// streaming out combined response
 			_respChunkChannel <- rsp
-			rsp = QwenResponse[T]{}
+			rsp = QwenStreamOutput[T]{}
 			continue
 		}
 
@@ -135,7 +135,7 @@ func _combineStreamingChunk[T IQwenContent](
 }
 
 // filled in response data line by line.
-func fillInRespData[T IQwenContent](line string, output *QwenResponse[T]) error {
+func fillInRespData[T IQwenContent](line string, output *QwenStreamOutput[T]) error {
 	if strings.TrimSpace(line) == "" {
 		return nil
 	}
@@ -157,7 +157,7 @@ func fillInRespData[T IQwenContent](line string, output *QwenResponse[T]) error 
 			output.Err = &WrapMessageError{Message: dataJSON}
 			return nil
 		}
-		outputData := QwenOutputMessage[T]{}
+		outputData := QwenOutputResponse[T]{}
 		err := json.Unmarshal([]byte(dataJSON), &outputData)
 		if err != nil {
 			return &WrapMessageError{Message: "unmarshal OutputData Err", Cause: err}

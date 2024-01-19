@@ -1,4 +1,4 @@
-package wanxclient
+package wanx
 
 import (
 	"context"

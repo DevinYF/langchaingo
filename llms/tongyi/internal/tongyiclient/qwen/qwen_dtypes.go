@@ -1,4 +1,4 @@
-package qwenclient
+package qwen
 
 import (
 	"context"
@@ -122,12 +122,12 @@ func (q *QwenRequest[T]) SetStreamingFunc(fn func(ctx context.Context, chunk []b
 	return q
 }
 
-type QwenResponse[T IQwenContent] struct {
-	ID         string               `json:"id"`
-	Event      string               `json:"event"`
-	HTTPStatus int                  `json:"http_status"`
-	Output     QwenOutputMessage[T] `json:"output"`
-	Err        error                `json:"error"`
+type QwenStreamOutput[T IQwenContent] struct {
+	ID         string                `json:"id"`
+	Event      string                `json:"event"`
+	HTTPStatus int                   `json:"http_status"`
+	Output     QwenOutputResponse[T] `json:"output"`
+	Err        error                 `json:"error"`
 }
 
 type Choice[T IQwenContent] struct {
@@ -140,13 +140,27 @@ type QwenOutput[T IQwenContent] struct {
 	Choices []Choice[T] `json:"choices"`
 }
 
-type QwenOutputMessage[T IQwenContent] struct {
-	Output QwenOutput[T] `json:"output"`
-	Usage  struct {
-		TotalTokens  int `json:"total_tokens"`
-		InputTokens  int `json:"input_tokens"`
-		OutputTokens int `json:"output_tokens"`
-	} `json:"usage"`
-	RequestID string `json:"request_id"`
+type Usage struct {
+	TotalTokens  int `json:"total_tokens"`
+	InputTokens  int `json:"input_tokens"`
+	OutputTokens int `json:"output_tokens"`
+}
+
+type QwenOutputResponse[T IQwenContent] struct {
+	Output    QwenOutput[T] `json:"output"`
+	Usage     Usage         `json:"usage"`
+	RequestID string        `json:"request_id"`
 	// ErrMsg    string `json:"error_msg"`
+}
+
+func (t *QwenOutputResponse[T]) GetChoices() []Choice[T] {
+	return t.Output.Choices
+}
+
+func (t *QwenOutputResponse[T]) GetUsage() Usage {
+	return t.Usage
+}
+
+func (t *QwenOutputResponse[T]) GetRequestID() string {
+	return t.RequestID
 }

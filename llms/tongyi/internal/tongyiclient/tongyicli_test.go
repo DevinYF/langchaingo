@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"os"
+	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -61,8 +62,9 @@ func TestBasic(t *testing.T) {
 
 	resp, err := cli.CreateCompletion(ctx, req)
 
-	fmt.Println("--> resp: ", resp.Output.Choices[0].Message.Content.ToString())
 	require.NoError(t, err)
+	fmt.Println("--> resp: ", len(resp.Output.Choices))
+	fmt.Println("--> resp: ", resp.Output.Choices[0].Message.Content.ToString())
 	assert.Regexp(t, "hello|hi|how|assist", resp.Output.Choices[0].Message.Content.ToString())
 }
 
@@ -73,6 +75,7 @@ func TestStreamingChunk(t *testing.T) {
 	cli := newTongyiClient(t, "qwen-turbo")
 
 	content := qwen.TextContent("Hello")
+
 	input := TextInput{
 		Messages: []TextMessage{
 			{Role: "user", Content: &content},
@@ -129,6 +132,8 @@ func TestVLBasic(t *testing.T) {
 		Input: input,
 	}
 
+	req.Parameters = qwen.DefaultParameters()
+
 	resp, err := cli.CreateVLCompletion(ctx, req)
 
 	require.NoError(t, err)
@@ -178,8 +183,8 @@ func TestVLStreamChund(t *testing.T) {
 	resp, err := cli.CreateVLCompletion(ctx, req)
 
 	require.NoError(t, err)
-	assert.Regexp(t, "dog|person|individual|woman|girl", resp.Output.Choices[0].Message.Content.ToString())
-	assert.Regexp(t, "dog|person|individual|woman|girl", output)
+	assert.Equal(t, output, resp.Output.Choices[0].Message.Content.ToString())
+	assert.Regexp(t, "dog|person|individual|woman|girl", strings.ToLower(output))
 }
 
 func TestImageGeneration(t *testing.T) {
@@ -349,7 +354,7 @@ func _mockSyncFunc(mockHTTPCli *httpclient.MockIHttpClient) {
 
 	text := qwen.TextContent("Hello! This is a mock message.")
 
-	mockResp := TextQwenOutputMessage{
+	mockResp := TextQwenResponse{
 		Output: TextQwenOutput{
 			Choices: []qwen.Choice[*qwen.TextContent]{
 				{

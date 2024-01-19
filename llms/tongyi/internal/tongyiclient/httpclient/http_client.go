@@ -190,7 +190,6 @@ func (c *HTTPCli) httpInner(ctx context.Context, method, url string, body interf
 		option(c)
 	}
 
-	log.Printf("http-log: request: url: 【%v】\n, body:【%v】\nheader: 【%v】\n, ", c.req.URL, c.req.Body, c.req.Header)
 	resp, err := c.client.Do(c.req)
 	if err != nil {
 		return nil, err
@@ -206,7 +205,6 @@ func (c *HTTPCli) httpInner(ctx context.Context, method, url string, body interf
 		err = &HTTPRequestError{Message: "request Failed: " + string(result), Code: resp.StatusCode}
 		return resp, err
 	}
-
 	// Note: close rsp at outer function
 	return resp, nil
 }

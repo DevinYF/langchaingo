@@ -1,4 +1,4 @@
-package qwenclient
+package qwen
 
 import "errors"
 

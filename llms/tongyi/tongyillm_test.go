@@ -2,6 +2,7 @@ package tongyi
 
 import (
 	"context"
+	"fmt"
 	"os"
 	"strings"
 	"testing"
@@ -12,14 +13,20 @@ import (
 	"github.com/tmc/langchaingo/schema"
 )
 
-func newQwenLlm(t *testing.T) *LLM {
+const (
+	QwenTextModel  = "qwen-turbo"
+	QwenVLModel    = "qwen-vl-plus"
+	EmbeddingModel = "text-embedding-v1"
+)
+
+func newQwenLlm(t *testing.T, model string) *LLM {
 	t.Helper()
 	dashscopeKey := os.Getenv(dashscopeTokenEnvName)
 	if dashscopeKey == "" {
 		t.Skip("DASHSCOPE_API_KEY not set")
 		return nil
 	}
-	modelOption := WithModel("qwen-turbo")
+	modelOption := WithModel(model)
 	tokenOption := WithToken(dashscopeKey)
 
 	llm, err := New(modelOption, tokenOption)
@@ -27,9 +34,63 @@ func newQwenLlm(t *testing.T) *LLM {
 	return llm
 }
 
+func TestVLBasic(t *testing.T) {
+	t.Parallel()
+	llm := newQwenLlm(t, QwenVLModel)
+
+	ctx := context.TODO()
+
+	parts := []llms.ContentPart{
+		llms.ImageURLContent{URL: "https://dashscope.oss-cn-beijing.aliyuncs.com/images/dog_and_girl.jpeg"},
+		llms.TextContent{Text: "briefly describe this image."},
+	}
+
+	mc := []llms.MessageContent{
+		{Role: schema.ChatMessageTypeHuman, Parts: parts},
+	}
+
+	resp, err := llm.GenerateContent(ctx, mc)
+	require.NoError(t, err)
+
+	assert.Regexp(t, "dog|person|individual|woman|girl", strings.ToLower(resp.Choices[0].Content))
+}
+
+func TestVLStreamChund(t *testing.T) {
+	t.Parallel()
+	llm := newQwenLlm(t, QwenVLModel)
+
+	ctx := context.TODO()
+
+	parts := []llms.ContentPart{
+		llms.ImageURLContent{URL: "https://dashscope.oss-cn-beijing.aliyuncs.com/images/dog_and_girl.jpeg"},
+		llms.TextContent{Text: "briefly describe this image."},
+	}
+
+	mc := []llms.MessageContent{
+		{Role: schema.ChatMessageTypeHuman, Parts: parts},
+	}
+
+	var output strings.Builder
+	streamCallbackFnOption := llms.WithStreamingFunc(
+		func(ctx context.Context, chunk []byte) error {
+			output.Write(chunk)
+			return nil
+		},
+	)
+
+	resp, err := llm.GenerateContent(ctx, mc, streamCallbackFnOption)
+	require.NoError(t, err)
+	assert.Equal(t, output.String(), resp.Choices[0].Content)
+
+	fmt.Println("->>> ", output.String())
+
+	assert.Regexp(t, "dog|person|individual|woman|girl", strings.ToLower(resp.Choices[0].Content))
+
+}
+
 func TestLLmBasic(t *testing.T) {
 	t.Parallel()
-	llm := newQwenLlm(t)
+	llm := newQwenLlm(t, QwenTextModel)
 
 	ctx := context.TODO()
 
@@ -41,7 +102,7 @@ func TestLLmBasic(t *testing.T) {
 
 func TestLLmStream(t *testing.T) {
 	t.Parallel()
-	llm := newQwenLlm(t)
+	llm := newQwenLlm(t, QwenTextModel)
 
 	ctx := context.TODO()
 	var sb strings.Builder
@@ -60,7 +121,7 @@ func TestLLmStream(t *testing.T) {
 
 func TestGenerateContentText(t *testing.T) {
 	t.Parallel()
-	llm := newQwenLlm(t)
+	llm := newQwenLlm(t, QwenTextModel)
 
 	ctx := context.TODO()
 
@@ -77,26 +138,19 @@ func TestGenerateContentText(t *testing.T) {
 		{Role: schema.ChatMessageTypeHuman, Parts: []llms.ContentPart{userContent}},
 	}
 
-	resp, err := llm.GenerateContent(ctx, mc, llms.WithStreamingFunc(
-		func(ctx context.Context, chunk []byte) error {
-			return nil
-		},
-	))
+	resp, err := llm.GenerateContent(ctx, mc)
 	require.NoError(t, err)
 	assert.NotEmpty(t, resp.Choices)
 	c1 := resp.Choices[0]
-
-	c1.Content = strings.ToLower(c1.Content)
 
 	assert.Regexp(t, "hello|hi|how|moring|good|today|assist", strings.ToLower(c1.Content))
 }
 
 func TestGenerateContentStream(t *testing.T) {
 	t.Parallel()
-	llm := newQwenLlm(t)
+	llm := newQwenLlm(t, QwenTextModel)
 
 	ctx := context.TODO()
-	var sb strings.Builder
 
 	sysContent := llms.TextContent{
 		Text: "You are a helpful Ai assistant.",
@@ -111,35 +165,26 @@ func TestGenerateContentStream(t *testing.T) {
 		{Role: schema.ChatMessageTypeHuman, Parts: []llms.ContentPart{userContent}},
 	}
 
-	resp, err := llm.GenerateContent(ctx, mc, llms.WithStreamingFunc(
+	var output strings.Builder
+	streamCallbackFn := llms.WithStreamingFunc(
 		func(ctx context.Context, chunk []byte) error {
-			sb.Write(chunk)
+			output.Write(chunk)
 			return nil
 		},
-	))
+	)
+
+	resp, err := llm.GenerateContent(ctx, mc, streamCallbackFn)
 	require.NoError(t, err)
 	assert.NotEmpty(t, resp.Choices)
 	c1 := resp.Choices[0]
 
-	c1.Content = strings.ToLower(c1.Content)
-
 	assert.Regexp(t, "hello|hi|how|moring|good|today|assist", strings.ToLower(c1.Content))
-	assert.Regexp(t, "hello|hi|how|moring|good|today|assist", strings.ToLower(sb.String()))
+	assert.Regexp(t, "hello|hi|how|moring|good|today|assist", strings.ToLower(output.String()))
 }
 
-// func TestGenerateContentImsge(t *testing.T) {
-// 	t.Parallel()
-// 	// llm := newQwenLlm(t)
-// 	// ctx := context.TODO()
-
-// 	// userContent := llms.TextContent{
-// 	// 	Text: "greet me in english.",
-// 	// }
-// }
-
-func TestEMbedding(t *testing.T) {
+func TestEmbedding(t *testing.T) {
 	t.Parallel()
-	llm := newQwenLlm(t)
+	llm := newQwenLlm(t, EmbeddingModel)
 
 	ctx := context.TODO()
 
@@ -151,3 +196,13 @@ func TestEMbedding(t *testing.T) {
 	assert.NotEmpty(t, resp)
 	assert.Len(t, resp, len(embeddingText))
 }
+
+// func TestGenerateContentImsge(t *testing.T) {
+// 	t.Parallel()
+// 	// llm := newQwenLlm(t)
+// 	// ctx := context.TODO()
+
+// 	// userContent := llms.TextContent{
+// 	// 	Text: "greet me in english.",
+// 	// }
+// }
