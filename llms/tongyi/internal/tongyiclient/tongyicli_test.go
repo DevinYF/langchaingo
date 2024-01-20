@@ -9,8 +9,6 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	httpclient "github.com/tmc/langchaingo/llms/tongyi/internal/tongyiclient/httpclient"
-
-	// TODO: 不要暴露内部的具体类型
 	qwen "github.com/tmc/langchaingo/llms/tongyi/internal/tongyiclient/qwen"
 	wanx "github.com/tmc/langchaingo/llms/tongyi/internal/tongyiclient/wanx"
 	"go.uber.org/mock/gomock"
@@ -35,7 +33,7 @@ func newMockClient(t *testing.T, model string, ctrl *gomock.Controller, f mockFn
 
 	f(mockHTTPCli)
 
-	qwenCli := newTongyiCLientWithHttpCli(model, fackToken, mockHTTPCli)
+	qwenCli := newTongyiCLientWithHTTPCli(model, fackToken, mockHTTPCli)
 	return qwenCli
 }
 
@@ -54,7 +52,7 @@ func TestBasic(t *testing.T) {
 		},
 	}
 
-	req := &TextQwenRequest{
+	req := &TextRequest{
 		Model: "qwen-turbo",
 		Input: input,
 	}
@@ -85,7 +83,7 @@ func TestStreamingChunk(t *testing.T) {
 		return nil
 	}
 
-	req := &TextQwenRequest{
+	req := &TextRequest{
 		// Model: "qwen-turbo",
 		Input:         input,
 		StreamingFunc: streamCallbackFn,
@@ -124,7 +122,7 @@ func TestVLBasic(t *testing.T) {
 		},
 	}
 
-	req := &VLQwenRequest{
+	req := &VLRequest{
 		Model: "qwen-vl-plus",
 		Input: input,
 	}
@@ -135,7 +133,6 @@ func TestVLBasic(t *testing.T) {
 
 	require.NoError(t, err)
 	assert.Regexp(t, "dog|person|individual|woman|girl", resp.Output.Choices[0].Message.Content.ToString())
-
 }
 
 func TestVLStreamChund(t *testing.T) {
@@ -171,7 +168,7 @@ func TestVLStreamChund(t *testing.T) {
 		return nil
 	}
 
-	req := &VLQwenRequest{
+	req := &VLRequest{
 		Model:         "qwen-vl-plus",
 		Input:         input,
 		StreamingFunc: streamCallbackFn,
@@ -190,9 +187,9 @@ func TestImageGeneration(t *testing.T) {
 
 	cli := newTongyiClient(t, "wanx-v1")
 
-	req := &wanx.WanxImageSynthesisRequest{
+	req := &wanx.ImageSynthesisRequest{
 		Model: "wanx-v1",
-		Input: wanx.WanxImageSynthesisInput{
+		Input: wanx.ImageSynthesisInput{
 			Prompt: "A beautiful sunset",
 		},
 	}
@@ -204,9 +201,7 @@ func TestImageGeneration(t *testing.T) {
 	for _, blob := range imgBlobs {
 		assert.NotEmpty(t, blob.Data)
 		assert.Equal(t, "image/png", blob.ImgType)
-
 	}
-
 }
 
 func TestMockStreamingChunk(t *testing.T) {
@@ -225,7 +220,7 @@ func TestMockStreamingChunk(t *testing.T) {
 		},
 	}
 
-	req := &TextQwenRequest{
+	req := &TextRequest{
 		Input: input,
 		StreamingFunc: func(ctx context.Context, chunk []byte) error {
 			output += string(chunk)
@@ -253,7 +248,7 @@ func TestMockBasic(t *testing.T) {
 		},
 	}
 
-	req := &TextQwenRequest{
+	req := &TextRequest{
 		Input: input,
 	}
 
@@ -352,7 +347,7 @@ func _mockSyncFunc(mockHTTPCli *httpclient.MockIHttpClient) {
 	text := qwen.TextContent("Hello! This is a mock message.")
 
 	mockResp := TextQwenResponse{
-		Output: TextQwenOutput{
+		Output: qwen.Output[*qwen.TextContent]{
 			Choices: []qwen.Choice[*qwen.TextContent]{
 				{
 					Message: TextMessage{

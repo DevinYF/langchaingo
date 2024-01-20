@@ -17,10 +17,10 @@ type TongyiClient struct {
 
 func NewTongyiClient(model string, token string) *TongyiClient {
 	httpcli := httpclient.NewHTTPClient()
-	return newTongyiCLientWithHttpCli(model, token, httpcli)
+	return newTongyiCLientWithHTTPCli(model, token, httpcli)
 }
 
-func newTongyiCLientWithHttpCli(model string, token string, httpcli httpclient.IHttpClient) *TongyiClient {
+func newTongyiCLientWithHTTPCli(model string, token string, httpcli httpclient.IHttpClient) *TongyiClient {
 	return &TongyiClient{
 		Model:   model,
 		httpCli: httpcli,
@@ -28,7 +28,8 @@ func newTongyiCLientWithHttpCli(model string, token string, httpcli httpclient.I
 	}
 }
 
-func (q *TongyiClient) CreateCompletion(ctx context.Context, payload *qwen.QwenRequest[*qwen.TextContent]) (*TextQwenResponse, error) {
+//nolint:lll
+func (q *TongyiClient) CreateCompletion(ctx context.Context, payload *qwen.Request[*qwen.TextContent]) (*TextQwenResponse, error) {
 	if payload.Model == "" {
 		payload.Model = q.Model
 	}
@@ -38,7 +39,8 @@ func (q *TongyiClient) CreateCompletion(ctx context.Context, payload *qwen.QwenR
 	return genericCompletion(ctx, payload, q.httpCli, q.token)
 }
 
-func (q *TongyiClient) CreateVLCompletion(ctx context.Context, payload *qwen.QwenRequest[*qwen.VLContentList]) (*VLQwenResponse, error) {
+//nolint:lll
+func (q *TongyiClient) CreateVLCompletion(ctx context.Context, payload *qwen.Request[*qwen.VLContentList]) (*VLQwenResponse, error) {
 	if payload.Model == "" {
 		payload.Model = q.Model
 	}
@@ -50,7 +52,8 @@ func (q *TongyiClient) CreateVLCompletion(ctx context.Context, payload *qwen.Qwe
 	return genericCompletion(ctx, payload, q.httpCli, q.token)
 }
 
-func genericCompletion[T qwen.IQwenContent](ctx context.Context, payload *qwen.QwenRequest[T], httpcli httpclient.IHttpClient, token string) (*qwen.QwenOutputResponse[T], error) {
+//nolint:lll
+func genericCompletion[T qwen.IQwenContent](ctx context.Context, payload *qwen.Request[T], httpcli httpclient.IHttpClient, token string) (*qwen.OutputResponse[T], error) {
 	if payload.Model == "" {
 		return nil, ErrModelNotSet
 	}
@@ -62,7 +65,8 @@ func genericCompletion[T qwen.IQwenContent](ctx context.Context, payload *qwen.Q
 	return qwen.SyncCall(ctx, payload, httpcli, token)
 }
 
-func (q *TongyiClient) CreateImageGeneration(ctx context.Context, payload *wanx.WanxImageSynthesisRequest) ([]*wanx.WanxImgBlob, error) {
+//nolint:lll
+func (q *TongyiClient) CreateImageGeneration(ctx context.Context, payload *wanx.ImageSynthesisRequest) ([]*wanx.ImgBlob, error) {
 	if payload.Model == "" {
 		if q.Model == "" {
 			return nil, ErrModelNotSet
@@ -72,8 +76,7 @@ func (q *TongyiClient) CreateImageGeneration(ctx context.Context, payload *wanx.
 	return wanx.CreateImageGeneration(ctx, payload, q.httpCli, q.token)
 }
 
-func (q *TongyiClient) CreateEmbedding(ctx context.Context, r *embedding.EmbeddingRequest) ([][]float32, error) {
-
+func (q *TongyiClient) CreateEmbedding(ctx context.Context, r *embedding.Request) ([][]float32, error) {
 	resp, err := embedding.CreateEmbedding(ctx, r, q.httpCli, q.token)
 	if err != nil {
 		return nil, err

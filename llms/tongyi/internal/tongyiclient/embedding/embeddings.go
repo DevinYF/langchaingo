@@ -11,7 +11,7 @@ const (
 	defaultEmbeddingModel = "text-embedding-v1"
 )
 
-type EmbeddingRequest struct {
+type Request struct {
 	Model string `json:"model"`
 	Input struct {
 		Texts []string `json:"texts"`
@@ -26,7 +26,7 @@ type Embedding struct {
 	Embedding []float32 `json:"embedding"`
 }
 
-type EmbeddingOutput struct {
+type Output struct {
 	Embeddings []Embedding `json:"embeddings"`
 	Usgae      struct {
 		TotalTokens int `json:"total_tokens"`
@@ -34,12 +34,12 @@ type EmbeddingOutput struct {
 	RequestID string `json:"request_id"`
 }
 
-type EmbeddingResponse struct {
-	Output EmbeddingOutput `json:"output"`
+type Response struct {
+	Output Output `json:"output"`
 }
 
-//nolilnt:lll
-func CreateEmbedding(ctx context.Context, req *EmbeddingRequest, cli httpclient.IHttpClient, token string) (*EmbeddingResponse, error) {
+//nolint:lll
+func CreateEmbedding(ctx context.Context, req *Request, cli httpclient.IHttpClient, token string) (*Response, error) {
 	if req.Model == "" {
 		req.Model = defaultEmbeddingModel
 	}
@@ -47,7 +47,7 @@ func CreateEmbedding(ctx context.Context, req *EmbeddingRequest, cli httpclient.
 		req.Params.TextType = "document"
 	}
 
-	resp := EmbeddingResponse{}
+	resp := Response{}
 	tokenOption := httpclient.WithTokenHeaderOption(token)
 	err := cli.Post(ctx, embeddingURL, req, &resp, tokenOption)
 	if err != nil {

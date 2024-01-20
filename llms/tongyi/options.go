@@ -6,7 +6,7 @@ import (
 )
 
 const (
-	dashscopeTokenEnvName = "DASHSCOPE_API_KEY"
+	dashscopeTokenEnvName = "DASHSCOPE_API_KEY" //nolint:gosec
 )
 
 type options struct {

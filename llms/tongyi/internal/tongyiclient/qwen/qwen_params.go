@@ -10,29 +10,29 @@ const (
 	QwenVLSubURL     = "/api/v1/services/aigc/multimodal-generation/generation"
 )
 
-type QwenModel string
+type ModelQwen string
 
 const (
-	QwenTurbo          QwenModel = "qwen-turbo"
-	QwenPlus           QwenModel = "qwen-plus"
-	QwenMax            QwenModel = "qwen-max"
-	QwenMax1201        QwenModel = "qwen-max-1201"
-	QwenMaxLongContext QwenModel = "qwen-max-longcontext"
+	QwenTurbo          ModelQwen = "qwen-turbo"
+	QwenPlus           ModelQwen = "qwen-plus"
+	QwenMax            ModelQwen = "qwen-max"
+	QwenMax1201        ModelQwen = "qwen-max-1201"
+	QwenMaxLongContext ModelQwen = "qwen-max-longcontext"
 )
 
 type Model struct{}
 
 // text-generation only.
-func QwenURL() string {
+func URLQwen() string {
 	return DashScopeBaseURL + QwenSubURL
 }
 
 // multimodal.
-func QwenVLURL() string {
+func URLQwenVL() string {
 	return DashScopeBaseURL + QwenVLSubURL
 }
 
-func ChoseQwenModel(model string) QwenModel {
+func ChoseModelQwen(model string) ModelQwen {
 	m := Model{}
 	switch model {
 	case "qwen-turbo":
@@ -51,22 +51,22 @@ func ChoseQwenModel(model string) QwenModel {
 	}
 }
 
-func (m *Model) QwenTurbo() QwenModel {
+func (m *Model) QwenTurbo() ModelQwen {
 	return QwenTurbo
 }
 
-func (m *Model) QwenPlus() QwenModel {
+func (m *Model) QwenPlus() ModelQwen {
 	return QwenPlus
 }
 
-func (m *Model) QwenMax() QwenModel {
+func (m *Model) QwenMax() ModelQwen {
 	return QwenMax
 }
 
-func (m *Model) QwenMax1201() QwenModel {
+func (m *Model) QwenMax1201() ModelQwen {
 	return QwenMax1201
 }
 
-func (m *Model) QwenMaxLongContext() QwenModel {
+func (m *Model) QwenMaxLongContext() ModelQwen {
 	return QwenMaxLongContext
 }

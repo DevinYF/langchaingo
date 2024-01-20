@@ -12,12 +12,13 @@ import (
 	httpclient "github.com/tmc/langchaingo/llms/tongyi/internal/tongyiclient/httpclient"
 )
 
-func AsyncParseStreamingChatResponse[T IQwenContent](ctx context.Context, payload *QwenRequest[T], cli httpclient.IHttpClient, token string) (*QwenOutputResponse[T], error) {
+//nolint:lll
+func AsyncParseStreamingChatResponse[T IQwenContent](ctx context.Context, payload *Request[T], cli httpclient.IHttpClient, token string) (*OutputResponse[T], error) {
 	if payload.Model == "" {
 		return nil, ErrModelNotSet
 	}
 	responseChan := asyncChatStreaming(ctx, payload, cli, token)
-	outputMessage := QwenOutputResponse[T]{}
+	outputMessage := OutputResponse[T]{}
 	for rspData := range responseChan {
 		if rspData.Err != nil {
 			return nil, &httpclient.HTTPRequestError{Message: "parseStreamingChatResponse failed", Cause: rspData.Err}
@@ -26,7 +27,7 @@ func AsyncParseStreamingChatResponse[T IQwenContent](ctx context.Context, payloa
 			return nil, ErrEmptyResponse
 		}
 
-		chunk := []byte(rspData.Output.Output.Choices[0].Message.Content.ToBytes())
+		chunk := rspData.Output.Output.Choices[0].Message.Content.ToBytes()
 
 		if payload.StreamingFunc != nil {
 			err := payload.StreamingFunc(ctx, chunk)
@@ -40,21 +41,25 @@ func AsyncParseStreamingChatResponse[T IQwenContent](ctx context.Context, payloa
 		if outputMessage.Output.Choices == nil {
 			outputMessage.Output.Choices = rspData.Output.Output.Choices
 		} else {
-			outputMessage.Output.Choices[0].Message.Role = rspData.Output.Output.Choices[0].Message.Role
-			outputMessage.Output.Choices[0].Message.Content.AppendText(rspData.Output.Output.Choices[0].Message.Content.ToString())
-			outputMessage.Output.Choices[0].FinishReason = rspData.Output.Output.Choices[0].FinishReason
+			choice := outputMessage.Output.Choices[0]
+			choice.Message.Role = rspData.Output.Output.Choices[0].Message.Role
+			choice.Message.Content.AppendText(rspData.Output.Output.Choices[0].Message.Content.ToString())
+			choice.FinishReason = rspData.Output.Output.Choices[0].FinishReason
+
+			outputMessage.Output.Choices[0] = choice
 		}
 	}
 
 	return &outputMessage, nil
 }
 
-func SyncCall[T IQwenContent](ctx context.Context, payload *QwenRequest[T], cli httpclient.IHttpClient, token string) (*QwenOutputResponse[T], error) {
+//nolint:lll
+func SyncCall[T IQwenContent](ctx context.Context, payload *Request[T], cli httpclient.IHttpClient, token string) (*OutputResponse[T], error) {
 	if payload.Model == "" {
 		return nil, ErrModelNotSet
 	}
 
-	resp := QwenOutputResponse[T]{}
+	resp := OutputResponse[T]{}
 	tokenOpt := httpclient.WithTokenHeaderOption(token)
 
 	// FIXME: 临时处理，后续需要统一
@@ -69,9 +74,10 @@ func SyncCall[T IQwenContent](ctx context.Context, payload *QwenRequest[T], cli 
 	return &resp, nil
 }
 
-func asyncChatStreaming[T IQwenContent](ctx context.Context, r *QwenRequest[T], cli httpclient.IHttpClient, token string) <-chan QwenStreamOutput[T] {
+//nolint:lll
+func asyncChatStreaming[T IQwenContent](ctx context.Context, r *Request[T], cli httpclient.IHttpClient, token string) <-chan StreamOutput[T] {
 	chanBuffer := 100
-	_respChunkChannel := make(chan QwenStreamOutput[T], chanBuffer)
+	_respChunkChannel := make(chan StreamOutput[T], chanBuffer)
 
 	go func() {
 		withHeader := map[string]string{
@@ -91,9 +97,9 @@ func asyncChatStreaming[T IQwenContent](ctx context.Context, r *QwenRequest[T], 
  */
 func _combineStreamingChunk[T IQwenContent](
 	ctx context.Context,
-	payload *QwenRequest[T],
+	payload *Request[T],
 	withHeader map[string]string,
-	_respChunkChannel chan QwenStreamOutput[T],
+	_respChunkChannel chan StreamOutput[T],
 	cli httpclient.IHttpClient,
 	token string,
 ) {
@@ -109,17 +115,17 @@ func _combineStreamingChunk[T IQwenContent](
 	_rawStreamOutChannel, err = cli.PostSSE(ctx, url, payload, headerOpt, tokenOpt)
 
 	if err != nil {
-		_respChunkChannel <- QwenStreamOutput[T]{Err: err}
+		_respChunkChannel <- StreamOutput[T]{Err: err}
 		return
 	}
 
-	rsp := QwenStreamOutput[T]{}
+	rsp := StreamOutput[T]{}
 
 	for v := range _rawStreamOutChannel {
 		if strings.TrimSpace(v) == "" {
 			// streaming out combined response
 			_respChunkChannel <- rsp
-			rsp = QwenStreamOutput[T]{}
+			rsp = StreamOutput[T]{}
 			continue
 		}
 
@@ -133,7 +139,7 @@ func _combineStreamingChunk[T IQwenContent](
 }
 
 // filled in response data line by line.
-func fillInRespData[T IQwenContent](line string, output *QwenStreamOutput[T]) error {
+func fillInRespData[T IQwenContent](line string, output *StreamOutput[T]) error {
 	if strings.TrimSpace(line) == "" {
 		return nil
 	}
@@ -155,7 +161,7 @@ func fillInRespData[T IQwenContent](line string, output *QwenStreamOutput[T]) er
 			output.Err = &WrapMessageError{Message: dataJSON}
 			return nil
 		}
-		outputData := QwenOutputResponse[T]{}
+		outputData := OutputResponse[T]{}
 		err := json.Unmarshal([]byte(dataJSON), &outputData)
 		if err != nil {
 			return &WrapMessageError{Message: "unmarshal OutputData Err", Cause: err}

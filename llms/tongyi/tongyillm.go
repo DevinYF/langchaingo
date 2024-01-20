@@ -8,15 +8,15 @@ import (
 
 	"github.com/tmc/langchaingo/callbacks"
 	"github.com/tmc/langchaingo/llms"
-	"github.com/tmc/langchaingo/schema"
-
 	"github.com/tmc/langchaingo/llms/tongyi/internal/tongyiclient"
+	"github.com/tmc/langchaingo/llms/tongyi/internal/tongyiclient/embedding"
 	"github.com/tmc/langchaingo/llms/tongyi/internal/tongyiclient/qwen"
+	"github.com/tmc/langchaingo/schema"
 )
 
 var (
 	ErrEmptyResponse            = errors.New("no response")
-	ErrMissingToken             = errors.New("missing the Dashscope API key, set it in the DASHSCOPE_API_KEY environment variable")
+	ErrMissingToken             = errors.New("missing the Dashscope API key, set it in the DASHSCOPE_API_KEY environment variable") //nolint:lll
 	ErrUnexpectedResponseLength = errors.New("unexpected length of response")
 	ErrIncompleteEmbedding      = errors.New("no all input got emmbedded")
 	ErrNotSupportImsgePart      = errors.New("not support Image parts yet")
@@ -35,8 +35,8 @@ func (e *UnSupportedRoleError) Error() string {
 
 type LLM struct {
 	CallbackHandler callbacks.Handler
-	client  *tongyiclient.TongyiClient
-	options options
+	client          *tongyiclient.TongyiClient
+	options         options
 }
 
 var _ llms.Model = (*LLM)(nil)
@@ -131,7 +131,7 @@ func (q *LLM) CreateEmbedding(ctx context.Context, inputTexts []string) ([][]flo
 		Texts: inputTexts,
 	}
 	embeddings, err := q.client.CreateEmbedding(ctx,
-		&tongyiclient.EmbeddingRequest{
+		&embedding.Request{
 			Input: input,
 		},
 	)
@@ -150,13 +150,12 @@ func messagesCntentToQwenMessages(messagesContent []llms.MessageContent) []tongy
 	qwenMessages := make([]tongyiclient.TextMessage, len(messagesContent))
 
 	for i, mc := range messagesContent {
-		foundText := false
-
 		qmsg := tongyiclient.NewTextMessage(typeToQwenRole(mc.Role))
+
+		foundText := false
 		for _, p := range mc.Parts {
 			switch pt := p.(type) {
 			case llms.TextContent:
-
 				qmsg.Content.SetText(pt.Text)
 
 				if foundText {
@@ -175,6 +174,7 @@ func messagesCntentToQwenMessages(messagesContent []llms.MessageContent) []tongy
 
 func messageConventToQwenVLMessage(messagesContent []llms.MessageContent) []tongyiclient.VLMessage {
 	qwenMessages := make([]tongyiclient.VLMessage, len(messagesContent))
+
 	for i, mc := range messagesContent {
 		qmsg := tongyiclient.NewVLMessage(typeToQwenRole(mc.Role))
 
@@ -192,7 +192,6 @@ func messageConventToQwenVLMessage(messagesContent []llms.MessageContent) []tong
 				qmsg.Content.SetText(pt.URL)
 			default:
 				panic("only support Text Image parts")
-
 			}
 		}
 		qwenMessages[i] = *qmsg
@@ -218,29 +217,12 @@ func typeToQwenRole(typ schema.ChatMessageType) string {
 	}
 }
 
+//nolint:lll
 func (q *LLM) doTextCompletionRequest(ctx context.Context, qwenTextMessages []tongyiclient.TextMessage, opts llms.CallOptions) (*tongyiclient.TextQwenResponse, error) {
-	if len(qwenTextMessages) == 0 {
-		return nil, ErrEmptyMessageContent
+	req, err := genericRequest(qwenTextMessages, opts)
+	if err != nil {
+		return nil, err
 	}
-
-	input := tongyiclient.TextInput{
-		Messages: qwenTextMessages,
-	}
-
-	params := tongyiclient.DefaultQwenParameters()
-	params.
-		SetMaxTokens(opts.MaxTokens).
-		SetTemperature(opts.Temperature).
-		SetTopP(opts.TopP).
-		SetTopK(opts.TopK).
-		SetSeed(opts.Seed)
-
-	req := &tongyiclient.TextQwenRequest{}
-	req.
-		SetModel(opts.Model).
-		SetInput(input).
-		SetParameters(params).
-		SetStreamingFunc(opts.StreamingFunc)
 
 	rsp, err := q.client.CreateCompletion(ctx, req)
 	if err != nil {
@@ -253,29 +235,12 @@ func (q *LLM) doTextCompletionRequest(ctx context.Context, qwenTextMessages []to
 	return rsp, nil
 }
 
+//nolint:lll
 func (q *LLM) doVLCompletionRequest(ctx context.Context, qwenVLMessages []tongyiclient.VLMessage, opts llms.CallOptions) (*tongyiclient.VLQwenResponse, error) {
-	if len(qwenVLMessages) == 0 {
-		return nil, ErrEmptyMessageContent
+	req, err := genericRequest(qwenVLMessages, opts)
+	if err != nil {
+		return nil, err
 	}
-
-	input := tongyiclient.VLInput{
-		Messages: qwenVLMessages,
-	}
-	// return foo(ctx, input, opts)
-	params := tongyiclient.DefaultQwenParameters()
-	params.
-		SetMaxTokens(opts.MaxTokens).
-		SetTemperature(opts.Temperature).
-		SetTopP(opts.TopP).
-		SetTopK(opts.TopK).
-		SetSeed(opts.Seed)
-
-	req := &tongyiclient.VLQwenRequest{}
-	req.
-		SetModel(opts.Model).
-		SetInput(input).
-		SetParameters(params).
-		SetStreamingFunc(opts.StreamingFunc)
 
 	rsp, err := q.client.CreateVLCompletion(ctx, req)
 	if err != nil {
@@ -288,6 +253,34 @@ func (q *LLM) doVLCompletionRequest(ctx context.Context, qwenVLMessages []tongyi
 	return rsp, nil
 }
 
+// nolint:lll
+func genericRequest[T qwen.IQwenContent](qwenMessages []qwen.Message[T], opts llms.CallOptions) (*qwen.Request[T], error) {
+	if len(qwenMessages) == 0 {
+		return nil, ErrEmptyMessageContent
+	}
+
+	input := qwen.Input[T]{
+		Messages: qwenMessages,
+	}
+
+	params := qwen.DefaultParameters()
+	params.
+		SetMaxTokens(opts.MaxTokens).
+		SetTemperature(opts.Temperature).
+		SetTopP(opts.TopP).
+		SetTopK(opts.TopK).
+		SetSeed(opts.Seed)
+
+	req := &qwen.Request[T]{}
+	req.
+		SetModel(opts.Model).
+		SetInput(input).
+		SetParameters(params).
+		SetStreamingFunc(opts.StreamingFunc)
+
+	return req, nil
+}
+
 func convertTongyiResultToContentChoice(resp IQwenResponseConverter) ([]*llms.ContentChoice, error) {
 	return resp.convertToContentChoice(), nil
 }
@@ -296,10 +289,9 @@ type IQwenResponseConverter interface {
 	convertToContentChoice() []*llms.ContentChoice
 }
 
-var _ IQwenResponseConverter = (*TextRespConverter)(nil)
-var _ IQwenResponseConverter = (*VLRespConverter)(nil)
-
 type TextRespConverter tongyiclient.TextQwenResponse
+
+var _ IQwenResponseConverter = (*TextRespConverter)(nil)
 
 func (t *TextRespConverter) convertToContentChoice() []*llms.ContentChoice {
 	return convertToContentChoice(t.Output.Choices, t.Usage)
@@ -307,12 +299,15 @@ func (t *TextRespConverter) convertToContentChoice() []*llms.ContentChoice {
 
 type VLRespConverter tongyiclient.VLQwenResponse
 
+var _ IQwenResponseConverter = (*VLRespConverter)(nil)
+
 func (t *VLRespConverter) convertToContentChoice() []*llms.ContentChoice {
 	vlresp := tongyiclient.VLQwenResponse(*t)
 	return convertToContentChoice(vlresp.Output.Choices, vlresp.Usage)
 }
 
-func convertToContentChoice[T tongyiclient.ITongyiCntent](rawchoices []qwen.Choice[T], usage qwen.Usage) []*llms.ContentChoice {
+// nolint:lll
+func convertToContentChoice[T qwen.IQwenContent](rawchoices []qwen.Choice[T], usage qwen.Usage) []*llms.ContentChoice {
 	choices := make([]*llms.ContentChoice, len(rawchoices))
 	for i, c := range rawchoices {
 		choices[i] = &llms.ContentChoice{

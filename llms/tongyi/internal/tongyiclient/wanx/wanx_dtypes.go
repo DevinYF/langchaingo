@@ -1,6 +1,6 @@
 package wanx
 
-type WanxImageSynthesisParams struct {
+type ImageSynthesisParams struct {
 	/*
 	  The style of the output image, currently supports the following style values:
 	  "<auto>" default,
@@ -36,18 +36,18 @@ const (
 	TaskRunning   TaskStatus = "RUNNING"
 )
 
-type WanxImageSynthesisInput struct {
+type ImageSynthesisInput struct {
 	Prompt        string `json:"prompt"`
 	NegativePromp string `json:"negative_promp,omitempty"`
 }
 
-type WanxImageSynthesisRequest struct {
-	Model  string                   `json:"model"`
-	Input  WanxImageSynthesisInput  `json:"input"`
-	Params WanxImageSynthesisParams `json:"parameters"`
+type ImageSynthesisRequest struct {
+	Model  string               `json:"model"`
+	Input  ImageSynthesisInput  `json:"input"`
+	Params ImageSynthesisParams `json:"parameters"`
 }
 
-type WanxOutput struct {
+type Output struct {
 	TaskID     string `json:"task_id"`
 	TaskStatus string `json:"task_status"`
 	Results    []struct {
@@ -60,32 +60,32 @@ type WanxOutput struct {
 	} `json:"task_metrics"`
 }
 
-type WanxUsage struct {
+type Usage struct {
 	ImageCount int `json:"image_count"`
 }
 
-type WanxImageResponse struct {
-	StatusCode int        `json:"status_code"`
-	RequestID  string     `json:"request_id"`
-	Code       string     `json:"code"`
-	Message    string     `json:"message"`
-	Output     WanxOutput `json:"output"`
-	Usage      WanxUsage  `json:"usage"`
+type ImageResponse struct {
+	StatusCode int    `json:"status_code"`
+	RequestID  string `json:"request_id"`
+	Code       string `json:"code"`
+	Message    string `json:"message"`
+	Output     Output `json:"output"`
+	Usage      Usage  `json:"usage"`
 }
 
-type WanxImgBlob struct {
+type ImgBlob struct {
 	//	types include: "image/png".
 	ImgType string
 	// Raw bytes for media formats.
 	Data []byte
 }
 
-type WanxTaskRequest struct {
+type TaskRequest struct {
 	TaskID string `json:"task_id"`
 }
 
-type WanxTaskResponse struct {
-	RequestID string     `json:"request_id"`
-	Output    WanxOutput `json:"output"`
-	Usage     WanxUsage  `json:"usage"`
+type TaskResponse struct {
+	RequestID string `json:"request_id"`
+	Output    Output `json:"output"`
+	Usage     Usage  `json:"usage"`
 }

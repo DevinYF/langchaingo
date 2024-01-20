@@ -31,54 +31,54 @@ func DefaultParameters() *Parameters {
 }
 
 func (p *Parameters) SetResultFormat(value string) *Parameters {
-	p = p.try_init()
+	p = p.tryInit()
 	p.ResultFormat = value
 	return p
 }
 
 func (p *Parameters) SetSeed(value int) *Parameters {
-	p = p.try_init()
+	p = p.tryInit()
 	p.Seed = value
 	return p
 }
 
 func (p *Parameters) SetMaxTokens(value int) *Parameters {
-	p = p.try_init()
+	p = p.tryInit()
 	p.MaxTokens = value
 	return p
 }
 
 func (p *Parameters) SetTopP(value float64) *Parameters {
-	p = p.try_init()
+	p = p.tryInit()
 	p.TopP = value
 	return p
 }
 
 func (p *Parameters) SetTopK(value int) *Parameters {
-	p = p.try_init()
+	p = p.tryInit()
 	p.TopK = value
 	return p
 }
 
 func (p *Parameters) SetTemperature(value float64) *Parameters {
-	p.try_init()
+	p.tryInit()
 	p.Temperature = value
 	return p
 }
 
 func (p *Parameters) SetEnableSearch(value bool) *Parameters {
-	p = p.try_init()
+	p = p.tryInit()
 	p.EnableSearch = value
 	return p
 }
 
 func (p *Parameters) SetIncrementalOutput(value bool) *Parameters {
-	p = p.try_init()
+	p = p.tryInit()
 	p.IncrementalOutput = value
 	return p
 }
 
-func (p *Parameters) try_init() *Parameters {
+func (p *Parameters) tryInit() *Parameters {
 	if p == nil {
 		p = &Parameters{}
 	}
@@ -94,7 +94,7 @@ type Input[T IQwenContent] struct {
 	Messages []Message[T] `json:"messages"`
 }
 
-type QwenRequest[T IQwenContent] struct {
+type Request[T IQwenContent] struct {
 	Model      string      `json:"model"`
 	Input      Input[T]    `json:"input"`
 	Parameters *Parameters `json:"parameters,omitempty"`
@@ -102,32 +102,32 @@ type QwenRequest[T IQwenContent] struct {
 	StreamingFunc func(ctx context.Context, chunk []byte) error `json:"-"`
 }
 
-func (q *QwenRequest[T]) SetModel(value string) *QwenRequest[T] {
+func (q *Request[T]) SetModel(value string) *Request[T] {
 	q.Model = value
 	return q
 }
 
-func (q *QwenRequest[T]) SetInput(value Input[T]) *QwenRequest[T] {
+func (q *Request[T]) SetInput(value Input[T]) *Request[T] {
 	q.Input = value
 	return q
 }
 
-func (q *QwenRequest[T]) SetParameters(value *Parameters) *QwenRequest[T] {
+func (q *Request[T]) SetParameters(value *Parameters) *Request[T] {
 	q.Parameters = value
 	return q
 }
 
-func (q *QwenRequest[T]) SetStreamingFunc(fn func(ctx context.Context, chunk []byte) error) *QwenRequest[T] {
+func (q *Request[T]) SetStreamingFunc(fn func(ctx context.Context, chunk []byte) error) *Request[T] {
 	q.StreamingFunc = fn
 	return q
 }
 
-type QwenStreamOutput[T IQwenContent] struct {
-	ID         string                `json:"id"`
-	Event      string                `json:"event"`
-	HTTPStatus int                   `json:"http_status"`
-	Output     QwenOutputResponse[T] `json:"output"`
-	Err        error                 `json:"error"`
+type StreamOutput[T IQwenContent] struct {
+	ID         string            `json:"id"`
+	Event      string            `json:"event"`
+	HTTPStatus int               `json:"http_status"`
+	Output     OutputResponse[T] `json:"output"`
+	Err        error             `json:"error"`
 }
 
 type Choice[T IQwenContent] struct {
@@ -136,7 +136,7 @@ type Choice[T IQwenContent] struct {
 }
 
 // new version response format.
-type QwenOutput[T IQwenContent] struct {
+type Output[T IQwenContent] struct {
 	Choices []Choice[T] `json:"choices"`
 }
 
@@ -146,21 +146,21 @@ type Usage struct {
 	OutputTokens int `json:"output_tokens"`
 }
 
-type QwenOutputResponse[T IQwenContent] struct {
-	Output    QwenOutput[T] `json:"output"`
-	Usage     Usage         `json:"usage"`
-	RequestID string        `json:"request_id"`
+type OutputResponse[T IQwenContent] struct {
+	Output    Output[T] `json:"output"`
+	Usage     Usage     `json:"usage"`
+	RequestID string    `json:"request_id"`
 	// ErrMsg    string `json:"error_msg"`
 }
 
-func (t *QwenOutputResponse[T]) GetChoices() []Choice[T] {
+func (t *OutputResponse[T]) GetChoices() []Choice[T] {
 	return t.Output.Choices
 }
 
-func (t *QwenOutputResponse[T]) GetUsage() Usage {
+func (t *OutputResponse[T]) GetUsage() Usage {
 	return t.Usage
 }
 
-func (t *QwenOutputResponse[T]) GetRequestID() string {
+func (t *OutputResponse[T]) GetRequestID() string {
 	return t.RequestID
 }

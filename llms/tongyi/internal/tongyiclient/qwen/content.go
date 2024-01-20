@@ -2,10 +2,14 @@ package qwen
 
 type IQwenContent interface {
 	*TextContent | *VLContentList
+	IQwenContentMethods
+}
+
+type IQwenContentMethods interface {
 	ToBytes() []byte
 	ToString() string
-	SetText(string)
-	AppendText(string)
+	SetText(text string)
+	AppendText(text string)
 
 	// TODO: 临时解决方案，后续需要重新设计
 	TargetURL() string
@@ -28,17 +32,17 @@ func (t *TextContent) ToString() string {
 	return string(str)
 }
 
-func (t *TextContent) SetText(s string) {
-	*t = TextContent(s)
+func (t *TextContent) SetText(text string) {
+	*t = TextContent(text)
 }
 
-func (t *TextContent) AppendText(s string) {
+func (t *TextContent) AppendText(text string) {
 	str := *t
-	*t = TextContent(string(str) + s)
+	*t = TextContent(string(str) + text)
 }
 
 func (t *TextContent) TargetURL() string {
-	return QwenURL()
+	return URLQwen()
 }
 
 type VLContent struct {
@@ -87,9 +91,9 @@ func (vlist *VLContentList) AppendText(s string) {
 	if vlist == nil || len(*vlist) == 0 {
 		panic("VLContentList is nil or empty")
 	}
-	(*vlist)[0].Text = (*vlist)[0].Text + s
+	(*vlist)[0].Text += s
 }
 
 func (vlist *VLContentList) TargetURL() string {
-	return QwenVLURL()
+	return URLQwenVL()
 }
