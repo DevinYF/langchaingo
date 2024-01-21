@@ -94,12 +94,14 @@ type Input[T IQwenContent] struct {
 	Messages []Message[T] `json:"messages"`
 }
 
+type StreamingFunc func(ctx context.Context, chunk []byte) error
+
 type Request[T IQwenContent] struct {
 	Model      string      `json:"model"`
 	Input      Input[T]    `json:"input"`
 	Parameters *Parameters `json:"parameters,omitempty"`
 
-	StreamingFunc func(ctx context.Context, chunk []byte) error `json:"-"`
+	StreamingFn StreamingFunc `json:"-"`
 }
 
 func (q *Request[T]) SetModel(value string) *Request[T] {
@@ -118,7 +120,7 @@ func (q *Request[T]) SetParameters(value *Parameters) *Request[T] {
 }
 
 func (q *Request[T]) SetStreamingFunc(fn func(ctx context.Context, chunk []byte) error) *Request[T] {
-	q.StreamingFunc = fn
+	q.StreamingFn = fn
 	return q
 }
 

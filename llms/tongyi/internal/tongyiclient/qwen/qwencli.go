@@ -13,15 +13,20 @@ import (
 )
 
 //nolint:lll
-func AsyncParseStreamingChatResponse[T IQwenContent](ctx context.Context, payload *Request[T], cli httpclient.IHttpClient, url, token string) (*OutputResponse[T], error) {
+func SendMessageStream[T IQwenContent](ctx context.Context, payload *Request[T], cli httpclient.IHttpClient, url, token string) (*OutputResponse[T], error) {
 	if payload.Model == "" {
 		return nil, ErrModelNotSet
 	}
 	responseChan := asyncChatStreaming(ctx, payload, cli, url, token)
+
+	return iterateStreamChannel(ctx, responseChan, payload.StreamingFn)
+}
+
+func iterateStreamChannel[T IQwenContent](ctx context.Context, channel <-chan StreamOutput[T], fn StreamingFunc) (*OutputResponse[T], error) {
 	outputMessage := OutputResponse[T]{}
-	for rspData := range responseChan {
+	for rspData := range channel {
 		if rspData.Err != nil {
-			return nil, &httpclient.HTTPRequestError{Message: "parseStreamingChatResponse failed", Cause: rspData.Err}
+			return nil, &httpclient.HTTPRequestError{Message: "SSE Error: ", Cause: rspData.Err}
 		}
 		if len(rspData.Output.Output.Choices) == 0 {
 			return nil, ErrEmptyResponse
@@ -29,11 +34,8 @@ func AsyncParseStreamingChatResponse[T IQwenContent](ctx context.Context, payloa
 
 		chunk := rspData.Output.Output.Choices[0].Message.Content.ToBytes()
 
-		if payload.StreamingFunc != nil {
-			err := payload.StreamingFunc(ctx, chunk)
-			if err != nil {
-				return nil, &httpclient.HTTPRequestError{Message: "parseStreamingChatResponse failed", Cause: err}
-			}
+		if err := fn(ctx, chunk); err != nil {
+			return nil, &WrapMessageError{Message: "StreamingFunc Error", Cause: err}
 		}
 
 		outputMessage.RequestID = rspData.Output.RequestID
@@ -54,7 +56,7 @@ func AsyncParseStreamingChatResponse[T IQwenContent](ctx context.Context, payloa
 }
 
 //nolint:lll
-func SyncCall[T IQwenContent](ctx context.Context, payload *Request[T], cli httpclient.IHttpClient, url, token string) (*OutputResponse[T], error) {
+func SendMessage[T IQwenContent](ctx context.Context, payload *Request[T], cli httpclient.IHttpClient, url, token string) (*OutputResponse[T], error) {
 	if payload.Model == "" {
 		return nil, ErrModelNotSet
 	}

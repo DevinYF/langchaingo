@@ -50,13 +50,12 @@ func genericCompletion[T qwen.IQwenContent](ctx context.Context, payload *qwen.R
 	}
 
 	// use streaming if streaming func is set
-	if payload.StreamingFunc != nil {
+	if payload.StreamingFn != nil {
 		payload.Parameters.SetIncrementalOutput(true)
-		return qwen.AsyncParseStreamingChatResponse(ctx, payload, httpcli, url, token)
+		return qwen.SendMessageStream(ctx, payload, httpcli, url, token)
 	}
 
-	// return whole response When finished if streaming is not set
-	return qwen.SyncCall(ctx, payload, httpcli, url, token)
+	return qwen.SendMessage(ctx, payload, httpcli, url, token)
 }
 
 // TODO: intergrate wanx.Request into qwen.IQwenContent(or should rename to ITongyiContent)
