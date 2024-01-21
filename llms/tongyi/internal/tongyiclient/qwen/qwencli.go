@@ -13,11 +13,11 @@ import (
 )
 
 //nolint:lll
-func AsyncParseStreamingChatResponse[T IQwenContent](ctx context.Context, payload *Request[T], cli httpclient.IHttpClient, token string) (*OutputResponse[T], error) {
+func AsyncParseStreamingChatResponse[T IQwenContent](ctx context.Context, payload *Request[T], cli httpclient.IHttpClient, url, token string) (*OutputResponse[T], error) {
 	if payload.Model == "" {
 		return nil, ErrModelNotSet
 	}
-	responseChan := asyncChatStreaming(ctx, payload, cli, token)
+	responseChan := asyncChatStreaming(ctx, payload, cli, url, token)
 	outputMessage := OutputResponse[T]{}
 	for rspData := range responseChan {
 		if rspData.Err != nil {
@@ -54,7 +54,7 @@ func AsyncParseStreamingChatResponse[T IQwenContent](ctx context.Context, payloa
 }
 
 //nolint:lll
-func SyncCall[T IQwenContent](ctx context.Context, payload *Request[T], cli httpclient.IHttpClient, token string) (*OutputResponse[T], error) {
+func SyncCall[T IQwenContent](ctx context.Context, payload *Request[T], cli httpclient.IHttpClient, url, token string) (*OutputResponse[T], error) {
 	if payload.Model == "" {
 		return nil, ErrModelNotSet
 	}
@@ -62,8 +62,6 @@ func SyncCall[T IQwenContent](ctx context.Context, payload *Request[T], cli http
 	resp := OutputResponse[T]{}
 	tokenOpt := httpclient.WithTokenHeaderOption(token)
 
-	// FIXME: 临时处理，后续需要统一
-	url := payload.Input.Messages[0].Content.TargetURL()
 	err := cli.Post(ctx, url, payload, &resp, tokenOpt)
 	if err != nil {
 		return nil, err
@@ -75,7 +73,7 @@ func SyncCall[T IQwenContent](ctx context.Context, payload *Request[T], cli http
 }
 
 //nolint:lll
-func asyncChatStreaming[T IQwenContent](ctx context.Context, r *Request[T], cli httpclient.IHttpClient, token string) <-chan StreamOutput[T] {
+func asyncChatStreaming[T IQwenContent](ctx context.Context, r *Request[T], cli httpclient.IHttpClient, url, token string) <-chan StreamOutput[T] {
 	chanBuffer := 100
 	_respChunkChannel := make(chan StreamOutput[T], chanBuffer)
 
@@ -84,7 +82,7 @@ func asyncChatStreaming[T IQwenContent](ctx context.Context, r *Request[T], cli 
 			"Accept": "text/event-stream",
 		}
 
-		_combineStreamingChunk(ctx, r, withHeader, _respChunkChannel, cli, token)
+		_combineStreamingChunk(ctx, r, withHeader, _respChunkChannel, cli, url, token)
 	}()
 	return _respChunkChannel
 }
@@ -101,6 +99,7 @@ func _combineStreamingChunk[T IQwenContent](
 	withHeader map[string]string,
 	_respChunkChannel chan StreamOutput[T],
 	cli httpclient.IHttpClient,
+	url string,
 	token string,
 ) {
 	defer close(_respChunkChannel)
@@ -110,8 +109,6 @@ func _combineStreamingChunk[T IQwenContent](
 	headerOpt := httpclient.WithHeader(withHeader)
 	tokenOpt := httpclient.WithTokenHeaderOption(token)
 
-	// FIXME: 临时处理，后续需要统一
-	url := payload.Input.Messages[0].Content.TargetURL()
 	_rawStreamOutChannel, err = cli.PostSSE(ctx, url, payload, headerOpt, tokenOpt)
 
 	if err != nil {

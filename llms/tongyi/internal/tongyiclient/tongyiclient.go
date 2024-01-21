@@ -28,43 +28,39 @@ func newTongyiCLientWithHTTPCli(model string, token string, httpcli httpclient.I
 	}
 }
 
-//nolint:lll
-func (q *TongyiClient) CreateCompletion(ctx context.Context, payload *qwen.Request[*qwen.TextContent]) (*TextQwenResponse, error) {
-	if payload.Model == "" {
-		payload.Model = q.Model
-	}
-	if payload.Parameters == nil {
-		payload.Parameters = qwen.DefaultParameters()
-	}
-	return genericCompletion(ctx, payload, q.httpCli, q.token)
+// duplicate: CreateCompletion and CreateVLCompletion are the same but with different payload types.
+// maybe this can be change in the future.
+//
+// nolint:lll
+func (q *TongyiClient) CreateCompletion(ctx context.Context, payload *qwen.Request[*qwen.TextContent], url string) (*TextQwenResponse, error) {
+	payload = paylosdPreCheck(q, payload)
+	return genericCompletion(ctx, payload, q.httpCli, url, q.token)
 }
 
 //nolint:lll
-func (q *TongyiClient) CreateVLCompletion(ctx context.Context, payload *qwen.Request[*qwen.VLContentList]) (*VLQwenResponse, error) {
-	if payload.Model == "" {
-		payload.Model = q.Model
-	}
-
-	if payload.Parameters == nil {
-		payload.Parameters = &qwen.Parameters{}
-	}
-
-	return genericCompletion(ctx, payload, q.httpCli, q.token)
+func (q *TongyiClient) CreateVLCompletion(ctx context.Context, payload *qwen.Request[*qwen.VLContentList], url string) (*VLQwenResponse, error) {
+	payload = paylosdPreCheck(q, payload)
+	return genericCompletion(ctx, payload, q.httpCli, url, q.token)
 }
 
 //nolint:lll
-func genericCompletion[T qwen.IQwenContent](ctx context.Context, payload *qwen.Request[T], httpcli httpclient.IHttpClient, token string) (*qwen.OutputResponse[T], error) {
+func genericCompletion[T qwen.IQwenContent](ctx context.Context, payload *qwen.Request[T], httpcli httpclient.IHttpClient, url, token string) (*qwen.OutputResponse[T], error) {
 	if payload.Model == "" {
 		return nil, ErrModelNotSet
 	}
 
+	// use streaming if streaming func is set
 	if payload.StreamingFunc != nil {
 		payload.Parameters.SetIncrementalOutput(true)
-		return qwen.AsyncParseStreamingChatResponse(ctx, payload, httpcli, token)
+		return qwen.AsyncParseStreamingChatResponse(ctx, payload, httpcli, url, token)
 	}
-	return qwen.SyncCall(ctx, payload, httpcli, token)
+
+	// return whole response When finished if streaming is not set
+	return qwen.SyncCall(ctx, payload, httpcli, url, token)
 }
 
+// TODO: intergrate wanx.Request into qwen.IQwenContent(or should rename to ITongyiContent)
+//
 //nolint:lll
 func (q *TongyiClient) CreateImageGeneration(ctx context.Context, payload *wanx.ImageSynthesisRequest) ([]*wanx.ImgBlob, error) {
 	if payload.Model == "" {
@@ -90,4 +86,16 @@ func (q *TongyiClient) CreateEmbedding(ctx context.Context, r *embedding.Request
 		embeddings = append(embeddings, resp.Output.Embeddings[i].Embedding)
 	}
 	return embeddings, nil
+}
+
+func paylosdPreCheck[T qwen.IQwenContent](q *TongyiClient, payload *qwen.Request[T]) *qwen.Request[T] {
+	if payload.Model == "" {
+		payload.Model = q.Model
+	}
+
+	if payload.Parameters == nil {
+		payload.Parameters = qwen.DefaultParameters()
+	}
+
+	return payload
 }

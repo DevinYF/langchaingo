@@ -29,6 +29,7 @@ func WithModel(model string) Option {
 	}
 }
 
+// TODO: This configuration has not taken effect.
 func WithDashscopeURL(rawURL string) Option {
 	return func(opts *options) {
 		var err error

@@ -1,5 +1,7 @@
 package qwen
 
+// qwen(text-generation) and qwen-vl(multi-modal) have different data format
+// so define generic interfaces for them.
 type IQwenContent interface {
 	*TextContent | *VLContentList
 	IQwenContentMethods
@@ -9,12 +11,11 @@ type IQwenContentMethods interface {
 	ToBytes() []byte
 	ToString() string
 	SetText(text string)
+	SetImage(url string)
 	AppendText(text string)
-
-	// TODO: 临时解决方案，后续需要重新设计
-	TargetURL() string
 }
 
+// TextConent is used for text-generation only.
 type TextContent string
 
 func NewTextContent() *TextContent {
@@ -36,21 +37,22 @@ func (t *TextContent) SetText(text string) {
 	*t = TextContent(text)
 }
 
+func (t *TextContent) SetImage(_ string) {
+	panic("text-generation only model: can not use SetImage for TextContent")
+}
+
 func (t *TextContent) AppendText(text string) {
 	str := *t
 	*t = TextContent(string(str) + text)
 }
 
-func (t *TextContent) TargetURL() string {
-	return URLQwen()
-}
+// VLContentList is used for multi-modal generation.
+type VLContentList []VLContent
 
 type VLContent struct {
 	Image string `json:"image,omitempty"`
 	Text  string `json:"text,omitempty"`
 }
-
-type VLContentList []VLContent
 
 func NewVLContentList() *VLContentList {
 	vl := VLContentList(make([]VLContent, 0))
@@ -61,7 +63,6 @@ func (vlist *VLContentList) ToBytes() []byte {
 	if vlist == nil || len(*vlist) == 0 {
 		return []byte("")
 	}
-	// TODO: handle multiple items later
 	return []byte((*vlist)[0].Text)
 }
 
@@ -69,7 +70,6 @@ func (vlist *VLContentList) ToString() string {
 	if vlist == nil || len(*vlist) == 0 {
 		return ""
 	}
-	// TODO: handle multiple items later
 	return (*vlist)[0].Text
 }
 
@@ -92,8 +92,4 @@ func (vlist *VLContentList) AppendText(s string) {
 		panic("VLContentList is nil or empty")
 	}
 	(*vlist)[0].Text += s
-}
-
-func (vlist *VLContentList) TargetURL() string {
-	return URLQwenVL()
 }

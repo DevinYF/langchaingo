@@ -56,7 +56,11 @@ func TestVLBasic(t *testing.T) {
 
 func TestVLStreamChund(t *testing.T) {
 	t.Parallel()
-	llm := newQwenLlm(t, QwenVLModel)
+
+	// set model to empty here to test modelOption below
+	llm := newQwenLlm(t, "")
+
+	modelOpt := llms.WithModel(QwenVLModel)
 
 	ctx := context.TODO()
 
@@ -77,7 +81,7 @@ func TestVLStreamChund(t *testing.T) {
 		},
 	)
 
-	resp, err := llm.GenerateContent(ctx, mc, streamCallbackFnOption)
+	resp, err := llm.GenerateContent(ctx, mc, streamCallbackFnOption, modelOpt)
 	require.NoError(t, err)
 	assert.Equal(t, output.String(), resp.Choices[0].Content)
 

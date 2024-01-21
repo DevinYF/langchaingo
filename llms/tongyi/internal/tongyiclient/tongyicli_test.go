@@ -57,7 +57,7 @@ func TestBasic(t *testing.T) {
 		Input: input,
 	}
 
-	resp, err := cli.CreateCompletion(ctx, req)
+	resp, err := cli.CreateCompletion(ctx, req, qwen.URLQwen())
 
 	require.NoError(t, err)
 	assert.Regexp(t, "hello|hi|how|assist", resp.Output.Choices[0].Message.Content.ToString())
@@ -88,7 +88,7 @@ func TestStreamingChunk(t *testing.T) {
 		Input:         input,
 		StreamingFunc: streamCallbackFn,
 	}
-	resp, err := cli.CreateCompletion(ctx, req)
+	resp, err := cli.CreateCompletion(ctx, req, qwen.URLQwen())
 
 	require.NoError(t, err)
 	assert.Regexp(t, "hello|hi|how|assist", resp.Output.Choices[0].Message.Content.ToString())
@@ -129,7 +129,7 @@ func TestVLBasic(t *testing.T) {
 
 	req.Parameters = qwen.DefaultParameters()
 
-	resp, err := cli.CreateVLCompletion(ctx, req)
+	resp, err := cli.CreateVLCompletion(ctx, req, qwen.URLQwenVL())
 
 	require.NoError(t, err)
 	assert.Regexp(t, "dog|person|individual|woman|girl", resp.Output.Choices[0].Message.Content.ToString())
@@ -174,7 +174,7 @@ func TestVLStreamChund(t *testing.T) {
 		StreamingFunc: streamCallbackFn,
 	}
 
-	resp, err := cli.CreateVLCompletion(ctx, req)
+	resp, err := cli.CreateVLCompletion(ctx, req, qwen.URLQwenVL())
 
 	require.NoError(t, err)
 	assert.Equal(t, output, resp.Output.Choices[0].Message.Content.ToString())
@@ -227,7 +227,9 @@ func TestMockStreamingChunk(t *testing.T) {
 			return nil
 		},
 	}
-	resp, err := cli.CreateCompletion(ctx, req)
+
+	mockURL := ""
+	resp, err := cli.CreateCompletion(ctx, req, mockURL)
 
 	require.NoError(t, err)
 
@@ -252,7 +254,8 @@ func TestMockBasic(t *testing.T) {
 		Input: input,
 	}
 
-	resp, err := cli.CreateCompletion(ctx, req)
+	mockURL := ""
+	resp, err := cli.CreateCompletion(ctx, req, mockURL)
 
 	require.NoError(t, err)
 

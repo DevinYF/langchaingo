@@ -2,36 +2,13 @@ package tongyi
 
 import (
 	"context"
-	"errors"
-	"fmt"
-	"log"
 
 	"github.com/tmc/langchaingo/callbacks"
 	"github.com/tmc/langchaingo/llms"
 	"github.com/tmc/langchaingo/llms/tongyi/internal/tongyiclient"
 	"github.com/tmc/langchaingo/llms/tongyi/internal/tongyiclient/embedding"
 	"github.com/tmc/langchaingo/llms/tongyi/internal/tongyiclient/qwen"
-	"github.com/tmc/langchaingo/schema"
 )
-
-var (
-	ErrEmptyResponse            = errors.New("no response")
-	ErrMissingToken             = errors.New("missing the Dashscope API key, set it in the DASHSCOPE_API_KEY environment variable") //nolint:lll
-	ErrUnexpectedResponseLength = errors.New("unexpected length of response")
-	ErrIncompleteEmbedding      = errors.New("no all input got emmbedded")
-	ErrNotSupportImsgePart      = errors.New("not support Image parts yet")
-	ErrMultipleTextParts        = errors.New("found multiple text parts in message")
-	ErrEmptyMessageContent      = errors.New("tongyi MessageContent is empty")
-	ErrNotImplemented           = errors.New("not implemented yet")
-)
-
-type UnSupportedRoleError struct {
-	Role schema.ChatMessageType
-}
-
-func (e *UnSupportedRoleError) Error() string {
-	return fmt.Sprintf("qwen role %s not supported", e.Role)
-}
 
 type LLM struct {
 	CallbackHandler callbacks.Handler
@@ -69,59 +46,12 @@ func (q *LLM) GenerateContent(ctx context.Context, messages []llms.MessageConten
 		opts.Model = q.client.Model
 	}
 
-	log.Println("debug... model: ", opts.Model)
-
 	choices, err := q.doCompletionRequest(ctx, messages, opts)
 	if err != nil {
 		return nil, err
 	}
 
 	return &llms.ContentResponse{Choices: choices}, nil
-}
-
-func (q *LLM) doCompletionRequest(
-	ctx context.Context,
-	messages []llms.MessageContent,
-	opts llms.CallOptions,
-) ([]*llms.ContentChoice, error) {
-	switch opts.Model {
-	// pure text-gen model.
-	case "qwen-turbo", "qwen-plus", "qwen-max", "qwen-max-1201", "qwen-max-longcontext":
-
-		tongyiContents := messagesCntentToQwenMessages(messages)
-
-		rsp, err := q.doTextCompletionRequest(ctx, tongyiContents, opts)
-		if err != nil {
-			return nil, err
-		}
-		if len(rsp.Output.Choices) == 0 {
-			return nil, ErrEmptyResponse
-		}
-
-		converter := TextRespConverter(*rsp)
-
-		return convertTongyiResultToContentChoice(&converter)
-	// multi-modal: text / image.
-	case "qwen-vl-plus":
-
-		tongyiContents := messageConventToQwenVLMessage(messages)
-		rsp, err := q.doVLCompletionRequest(ctx, tongyiContents, opts)
-		if err != nil {
-			return nil, err
-		}
-		if len(rsp.Output.Choices) == 0 {
-			return nil, ErrEmptyResponse
-		}
-
-		converter := VLRespConverter(*rsp)
-
-		return convertTongyiResultToContentChoice(&converter)
-	// image generation
-	case "wanx-v1":
-		panic("do Completion Error: not implemented wanx-v1 yet")
-	default:
-		panic("do Completion Error: not support model")
-	}
 }
 
 func (q *LLM) CreateEmbedding(ctx context.Context, inputTexts []string) ([][]float32, error) {
@@ -146,75 +76,43 @@ func (q *LLM) CreateEmbedding(ctx context.Context, inputTexts []string) ([][]flo
 	return embeddings, nil
 }
 
-func messagesCntentToQwenMessages(messagesContent []llms.MessageContent) []tongyiclient.TextMessage {
-	qwenMessages := make([]tongyiclient.TextMessage, len(messagesContent))
+func (q *LLM) doCompletionRequest(
+	ctx context.Context,
+	messages []llms.MessageContent,
+	opts llms.CallOptions,
+) ([]*llms.ContentChoice, error) {
+	var converter IQwenResponseConverter
 
-	for i, mc := range messagesContent {
-		qmsg := tongyiclient.NewTextMessage(typeToQwenRole(mc.Role))
+	switch opts.Model {
+	// pure text-gen model.
+	case "qwen-turbo", "qwen-plus", "qwen-max", "qwen-max-1201", "qwen-max-longcontext":
+		textMessages := messagesCntentToQwenTextMessages(messages)
 
-		foundText := false
-		for _, p := range mc.Parts {
-			switch pt := p.(type) {
-			case llms.TextContent:
-				qmsg.Content.SetText(pt.Text)
-
-				if foundText {
-					panic(ErrMultipleTextParts)
-				}
-				foundText = true
-			default:
-				panic("only support Text parts right now")
-			}
+		rsp, err := q.doTextCompletionRequest(ctx, textMessages, opts)
+		if err != nil {
+			return nil, err
 		}
 
-		qwenMessages[i] = *qmsg
-	}
-	return qwenMessages
-}
+		temp := TextRespConverter(*rsp)
+		converter = &temp
+	// multi-modal: text / image.
+	case "qwen-vl-plus":
+		vlMessages := messageConventToQwenVLMessage(messages)
 
-func messageConventToQwenVLMessage(messagesContent []llms.MessageContent) []tongyiclient.VLMessage {
-	qwenMessages := make([]tongyiclient.VLMessage, len(messagesContent))
-
-	for i, mc := range messagesContent {
-		qmsg := tongyiclient.NewVLMessage(typeToQwenRole(mc.Role))
-
-		foundText := false
-		for _, p := range mc.Parts {
-			switch pt := p.(type) {
-			case llms.TextContent:
-				qmsg.Content.SetText(pt.Text)
-
-				if foundText {
-					panic(ErrMultipleTextParts)
-				}
-				foundText = true
-			case llms.ImageURLContent:
-				qmsg.Content.SetText(pt.URL)
-			default:
-				panic("only support Text Image parts")
-			}
+		rsp, err := q.doVLCompletionRequest(ctx, vlMessages, opts)
+		if err != nil {
+			return nil, err
 		}
-		qwenMessages[i] = *qmsg
-	}
-
-	return qwenMessages
-}
-
-func typeToQwenRole(typ schema.ChatMessageType) string {
-	switch typ {
-	case schema.ChatMessageTypeSystem:
-		return "system"
-	case schema.ChatMessageTypeAI:
-		return "assistant"
-	case schema.ChatMessageTypeHuman:
-		return "user"
-	case schema.ChatMessageTypeGeneric:
-		return "user"
-	case schema.ChatMessageTypeFunction:
-		fallthrough
+		temp := VLRespConverter(*rsp)
+		converter = &temp
+	// image generation
+	case "wanx-v1":
+		panic("do Completion Error: not implemented wanx-v1 yet")
 	default:
-		panic(&UnSupportedRoleError{Role: typ})
+		panic("do Completion Error: not support model")
 	}
+
+	return convertTongyiResultToContentChoice(converter)
 }
 
 //nolint:lll
@@ -224,12 +122,16 @@ func (q *LLM) doTextCompletionRequest(ctx context.Context, qwenTextMessages []to
 		return nil, err
 	}
 
-	rsp, err := q.client.CreateCompletion(ctx, req)
+	rsp, err := q.client.CreateCompletion(ctx, req, qwen.URLQwen())
 	if err != nil {
 		if q.CallbackHandler != nil {
 			q.CallbackHandler.HandleLLMError(ctx, err)
 		}
 		return nil, err
+	}
+
+	if len(rsp.Output.Choices) == 0 {
+		return nil, ErrEmptyResponse
 	}
 
 	return rsp, nil
@@ -242,12 +144,16 @@ func (q *LLM) doVLCompletionRequest(ctx context.Context, qwenVLMessages []tongyi
 		return nil, err
 	}
 
-	rsp, err := q.client.CreateVLCompletion(ctx, req)
+	rsp, err := q.client.CreateVLCompletion(ctx, req, qwen.URLQwenVL())
 	if err != nil {
 		if q.CallbackHandler != nil {
 			q.CallbackHandler.HandleLLMError(ctx, err)
 		}
 		return nil, err
+	}
+
+	if len(rsp.Output.Choices) == 0 {
+		return nil, ErrEmptyResponse
 	}
 
 	return rsp, nil
@@ -279,46 +185,4 @@ func genericRequest[T qwen.IQwenContent](qwenMessages []qwen.Message[T], opts ll
 		SetStreamingFunc(opts.StreamingFunc)
 
 	return req, nil
-}
-
-func convertTongyiResultToContentChoice(resp IQwenResponseConverter) ([]*llms.ContentChoice, error) {
-	return resp.convertToContentChoice(), nil
-}
-
-type IQwenResponseConverter interface {
-	convertToContentChoice() []*llms.ContentChoice
-}
-
-type TextRespConverter tongyiclient.TextQwenResponse
-
-var _ IQwenResponseConverter = (*TextRespConverter)(nil)
-
-func (t *TextRespConverter) convertToContentChoice() []*llms.ContentChoice {
-	return convertToContentChoice(t.Output.Choices, t.Usage)
-}
-
-type VLRespConverter tongyiclient.VLQwenResponse
-
-var _ IQwenResponseConverter = (*VLRespConverter)(nil)
-
-func (t *VLRespConverter) convertToContentChoice() []*llms.ContentChoice {
-	vlresp := tongyiclient.VLQwenResponse(*t)
-	return convertToContentChoice(vlresp.Output.Choices, vlresp.Usage)
-}
-
-// nolint:lll
-func convertToContentChoice[T qwen.IQwenContent](rawchoices []qwen.Choice[T], usage qwen.Usage) []*llms.ContentChoice {
-	choices := make([]*llms.ContentChoice, len(rawchoices))
-	for i, c := range rawchoices {
-		choices[i] = &llms.ContentChoice{
-			Content:    c.Message.Content.ToString(),
-			StopReason: c.FinishReason,
-			GenerationInfo: map[string]any{
-				"PromptTokens":     usage.InputTokens,
-				"CompletionTokens": usage.OutputTokens,
-				"TotalTokens":      usage.TotalTokens,
-			},
-		}
-	}
-	return choices
 }

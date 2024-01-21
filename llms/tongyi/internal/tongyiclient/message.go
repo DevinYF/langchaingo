@@ -6,32 +6,21 @@ import (
 
 type (
 	TextInput        = qwen.Input[*qwen.TextContent]
-	TextRequest      = qwen.Request[*qwen.TextContent]
-	TextQwenResponse = qwen.OutputResponse[*qwen.TextContent]
 	VLInput          = qwen.Input[*qwen.VLContentList]
+	TextRequest      = qwen.Request[*qwen.TextContent]
 	VLRequest        = qwen.Request[*qwen.VLContentList]
+	TextQwenResponse = qwen.OutputResponse[*qwen.TextContent]
 	VLQwenResponse   = qwen.OutputResponse[*qwen.VLContentList]
+	TextMessage      = qwen.Message[*qwen.TextContent]
+	VLMessage        = qwen.Message[*qwen.VLContentList]
 )
 
-// qwen.
-type TextMessage = qwen.Message[*qwen.TextContent]
-
-func NewTextMessage(role string) *TextMessage {
-	content := qwen.NewTextContent()
-
-	return &TextMessage{
-		Role:    role,
-		Content: content,
+func NewQwenMessage[T qwen.IQwenContent](role string, content T) *qwen.Message[T] {
+	if content == nil {
+		panic("content is nil")
 	}
-}
 
-// qwen-vl.
-type VLMessage = qwen.Message[*qwen.VLContentList]
-
-func NewVLMessage(role string) *VLMessage {
-	content := qwen.NewVLContentList()
-
-	return &qwen.Message[*qwen.VLContentList]{
+	return &qwen.Message[T]{
 		Role:    role,
 		Content: content,
 	}
