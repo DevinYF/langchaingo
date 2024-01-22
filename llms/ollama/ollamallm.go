@@ -31,7 +31,7 @@ func New(opts ...Option) (*LLM, error) {
 		opt(&o)
 	}
 
-	client, err := ollamaclient.NewClient(o.ollamaServerURL)
+	client, err := ollamaclient.NewClient(o.ollamaServerURL, o.httpClient)
 	if err != nil {
 		return nil, err
 	}
@@ -41,7 +41,7 @@ func New(opts ...Option) (*LLM, error) {
 
 // Call Implement the call interface for LLM.
 func (o *LLM) Call(ctx context.Context, prompt string, options ...llms.CallOption) (string, error) {
-	return llms.CallLLM(ctx, o, prompt, options...)
+	return llms.GenerateFromSinglePrompt(ctx, o, prompt, options...)
 }
 
 // GenerateContent implements the Model interface.

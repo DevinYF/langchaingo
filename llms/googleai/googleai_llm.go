@@ -1,16 +1,14 @@
 // package googleai implements a langchaingo provider for Google AI LLMs.
 // See https://ai.google.dev/ for more details and documetnation.
 //
-//nolint:goerr113, lll
+// nolint: lll
 package googleai
 
 import (
 	"context"
 	"errors"
 	"fmt"
-	"io"
 	"log"
-	"net/http"
 	"strings"
 
 	"github.com/google/generative-ai-go/genai"
@@ -64,29 +62,36 @@ func NewGoogleAI(ctx context.Context, opts ...Option) (*GoogleAI, error) {
 	return gi, nil
 }
 
-// Call Implement the call interface for LLM.
+// Call implements the [llms.Model] interface.
 func (g *GoogleAI) Call(ctx context.Context, prompt string, options ...llms.CallOption) (string, error) {
-	return llms.CallLLM(ctx, g, prompt, options...)
+	return llms.GenerateFromSinglePrompt(ctx, g, prompt, options...)
 }
 
-// GenerateContent calls the LLM with the provided parts.
+// GenerateContent implements the [llms.Model] interface.
 func (g *GoogleAI) GenerateContent(ctx context.Context, messages []llms.MessageContent, options ...llms.CallOption) (*llms.ContentResponse, error) {
 	if g.CallbacksHandler != nil {
 		g.CallbacksHandler.HandleLLMGenerateContentStart(ctx, messages)
 	}
 
 	opts := llms.CallOptions{
-		Model:       g.opts.defaultModel,
-		MaxTokens:   int(g.opts.defaultMaxTokens),
-		Temperature: float64(g.opts.defaultTemperature),
+		Model:          g.opts.defaultModel,
+		CandidateCount: g.opts.defaultCandidateCount,
+		MaxTokens:      g.opts.defaultMaxTokens,
+		Temperature:    g.opts.defaultTemperature,
+		TopP:           g.opts.defaultTopP,
+		TopK:           g.opts.defaultTopK,
 	}
 	for _, opt := range options {
 		opt(&opts)
 	}
 
 	model := g.client.GenerativeModel(opts.Model)
+	model.SetCandidateCount(int32(opts.CandidateCount))
 	model.SetMaxOutputTokens(int32(opts.MaxTokens))
 	model.SetTemperature(float32(opts.Temperature))
+	model.SetTopP(float32(opts.TopP))
+	model.SetTopK(int32(opts.TopK))
+	model.StopSequences = opts.StopWords
 
 	var response *llms.ContentResponse
 	var err error
@@ -111,35 +116,6 @@ func (g *GoogleAI) GenerateContent(ctx context.Context, messages []llms.MessageC
 	return response, nil
 }
 
-// downloadImageData downloads the content from the given URL and returns it as
-// a *genai.Blob.
-func downloadImageData(url string) (*genai.Blob, error) {
-	resp, err := http.Get(url) //nolint
-	if err != nil {
-		return nil, fmt.Errorf("failed to fetch image from url: %w", err)
-	}
-	defer resp.Body.Close()
-
-	urlData, err := io.ReadAll(resp.Body)
-	if err != nil {
-		return nil, fmt.Errorf("failed to read image bytes: %w", err)
-	}
-
-	mimeType := resp.Header.Get("Content-Type")
-
-	// The convenience function genai.ImageData requires just the right part of
-	// the mime type, so we need to parse it
-	parts := strings.Split(mimeType, "/")
-
-	if len(parts) != 2 { //nolint
-		return nil, ErrInvalidMimeType
-	}
-
-	blob := genai.ImageData(parts[1], urlData)
-
-	return &blob, nil
-}
-
 // convertCandidates converts a sequence of genai.Candidate to a response.
 func convertCandidates(candidates []*genai.Candidate) (*llms.ContentResponse, error) {
 	var contentResponse llms.ContentResponse
@@ -147,14 +123,16 @@ func convertCandidates(candidates []*genai.Candidate) (*llms.ContentResponse, er
 	for _, candidate := range candidates {
 		buf := strings.Builder{}
 
-		for _, part := range candidate.Content.Parts {
-			if v, ok := part.(genai.Text); ok {
-				_, err := buf.WriteString(string(v))
-				if err != nil {
-					return nil, err
+		if candidate.Content != nil {
+			for _, part := range candidate.Content.Parts {
+				if v, ok := part.(genai.Text); ok {
+					_, err := buf.WriteString(string(v))
+					if err != nil {
+						return nil, err
+					}
+				} else {
+					return nil, ErrUnknownPartInResponse
 				}
-			} else {
-				return nil, ErrUnknownPartInResponse
 			}
 		}
 
@@ -193,7 +171,6 @@ func convertParts(parts []llms.ContentPart) ([]genai.Part, error) {
 	convertedParts := make([]genai.Part, 0, len(parts))
 	for _, part := range parts {
 		var out genai.Part
-		var err error
 
 		switch p := part.(type) {
 		case llms.TextContent:
@@ -201,10 +178,11 @@ func convertParts(parts []llms.ContentPart) ([]genai.Part, error) {
 		case llms.BinaryContent:
 			out = genai.Blob{MIMEType: p.MIMEType, Data: p.Data}
 		case llms.ImageURLContent:
-			out, err = downloadImageData(p.URL)
-		}
-		if err != nil {
-			return nil, err
+			typ, data, err := downloadImageData(p.URL)
+			if err != nil {
+				return nil, err
+			}
+			out = genai.ImageData(typ, data)
 		}
 
 		convertedParts = append(convertedParts, out)
