@@ -86,7 +86,7 @@ func TestStreamingChunk(t *testing.T) {
 	req := &TextRequest{
 		// Model: "qwen-turbo",
 		Input:         input,
-		StreamingFunc: streamCallbackFn,
+		StreamingFn: streamCallbackFn,
 	}
 	resp, err := cli.CreateCompletion(ctx, req, qwen.URLQwen())
 
@@ -171,7 +171,7 @@ func TestVLStreamChund(t *testing.T) {
 	req := &VLRequest{
 		Model:         "qwen-vl-plus",
 		Input:         input,
-		StreamingFunc: streamCallbackFn,
+		StreamingFn: streamCallbackFn,
 	}
 
 	resp, err := cli.CreateVLCompletion(ctx, req, qwen.URLQwenVL())
@@ -222,7 +222,7 @@ func TestMockStreamingChunk(t *testing.T) {
 
 	req := &TextRequest{
 		Input: input,
-		StreamingFunc: func(ctx context.Context, chunk []byte) error {
+		StreamingFn: func(ctx context.Context, chunk []byte) error {
 			output += string(chunk)
 			return nil
 		},

@@ -31,7 +31,7 @@ func New(opts ...Option) (*LLM, error) {
 
 // Call implements llms.LLM.
 func (q *LLM) Call(ctx context.Context, prompt string, options ...llms.CallOption) (string, error) {
-	return llms.CallLLM(ctx, q, prompt, options...)
+	return llms.GenerateFromSinglePrompt(ctx, q, prompt, options...)
 }
 
 // nolint:lll
