@@ -108,6 +108,7 @@ require (
 	github.com/PuerkitoBio/goquery v1.8.1
 	github.com/amikos-tech/chroma-go v0.0.0-20231228181736-e8f5e927093e
 	github.com/cohere-ai/tokenizer v1.1.2
+	github.com/gabriel-vasile/mimetype v1.4.3
 	github.com/go-openapi/strfmt v0.21.3
 	github.com/go-sql-driver/mysql v1.7.1
 	github.com/gocolly/colly v1.2.0

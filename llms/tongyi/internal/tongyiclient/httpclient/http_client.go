@@ -5,11 +5,14 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"fmt"
 	"image"
 	"image/png"
 	"io"
 	"net/http"
+	"net/url"
 	"os/exec"
+	"strings"
 	"time"
 )
 
@@ -19,7 +22,7 @@ type HTTPOption func(c *HTTPCli)
 type IHttpClient interface {
 	PostSSE(ctx context.Context, urll string, reqbody interface{}, options ...HTTPOption) (chan string, error)
 	Post(ctx context.Context, urll string, reqbody interface{}, resp interface{}, options ...HTTPOption) error
-	Get(ctx context.Context, urll string, resp interface{}, options ...HTTPOption) error
+	Get(ctx context.Context, urll string, params map[string]string, resp interface{}, options ...HTTPOption) error
 	GetImage(ctx context.Context, imgURL string, options ...HTTPOption) ([]byte, error)
 }
 
@@ -39,8 +42,22 @@ func NewHTTPClient() *HTTPCli {
 	}
 }
 
-func (c *HTTPCli) Get(ctx context.Context, imgURL string, respbody interface{}, options ...HTTPOption) error {
-	resp, err := c.httpInner(ctx, "GET", imgURL, nil, options...)
+func (c *HTTPCli) Get(ctx context.Context, urll string, params map[string]string, respbody interface{}, options ...HTTPOption) error {
+	if params != nil {
+		var flag bool
+		for k, v := range params {
+			if !flag {
+				urll += "?"
+				flag = true
+			}
+			urll = fmt.Sprintf("%s%s=%s&", urll, k, url.QueryEscape(v))
+		}
+		urll = strings.TrimSuffix(urll, "&")
+	}
+
+	fmt.Println("debug url: ", urll)
+
+	resp, err := c.httpInner(ctx, "GET", urll, nil, options...)
 	if err != nil {
 		return err
 	}
@@ -121,7 +138,9 @@ func (c *HTTPCli) PostSSE(ctx context.Context, urll string, reqbody interface{},
 
 // nolint:lll
 func (c *HTTPCli) Post(ctx context.Context, urll string, reqbody interface{}, respbody interface{}, options ...HTTPOption) error {
-	options = append(options, WithHeader(HeaderMap{"content-type": "application/json"}))
+	// options = append(options, WithHeader(HeaderMap{"content-type": "application/json"}))
+
+	// fmt.Printf("debug body111 : %+v\n ", reqbody)
 
 	if reqbody == nil {
 		err := &EmptyRequestBodyError{}
@@ -143,18 +162,23 @@ func (c *HTTPCli) Post(ctx context.Context, urll string, reqbody interface{}, re
 		return err
 	}
 
-	err = json.Unmarshal(result, &respbody)
-	if err != nil {
-		return &WrapMessageError{Message: "Unmarshal Json failed", Cause: err}
+	if len(result) != 0 && respbody != nil {
+		err = json.Unmarshal(result, &respbody)
+		if err != nil {
+			return &WrapMessageError{Message: "Unmarshal Json failed", Cause: err}
+		}
 	}
 
 	return nil
 }
 
-func (c *HTTPCli) EncodeJSONBody(body interface{}) ([]byte, error) {
+// func (c *HTTPCli) EncodeJSONBody(body interface{}) ([]byte, error) {
+func (c *HTTPCli) EncodeJSONBody(body interface{}) (*bytes.Buffer, error) {
 	if body != nil {
 		var bodyJSON []byte
 		switch body := body.(type) {
+		case *bytes.Buffer:
+			return body, nil
 		case []byte:
 			bodyJSON = body
 		default:
@@ -164,21 +188,22 @@ func (c *HTTPCli) EncodeJSONBody(body interface{}) ([]byte, error) {
 				return nil, err
 			}
 		}
-		return bodyJSON, nil
+		return bytes.NewBuffer(bodyJSON), nil
 	}
-	return nil, nil
+	return bytes.NewBuffer(nil), nil
 }
 
 // nolint:lll
 func (c *HTTPCli) httpInner(ctx context.Context, method, url string, body interface{}, options ...HTTPOption) (*http.Response, error) {
 	var err error
 
-	bodyJSON, err := c.EncodeJSONBody(body)
+	// fmt.Printf("debug... body: %+v\n", body)
+	bodyBuffer, err := c.EncodeJSONBody(body)
 	if err != nil {
 		return nil, err
 	}
 
-	c.req, err = http.NewRequestWithContext(ctx, method, url, bytes.NewBuffer(bodyJSON))
+	c.req, err = http.NewRequestWithContext(ctx, method, url, bodyBuffer)
 	if err != nil {
 		return nil, err
 	}
@@ -186,6 +211,8 @@ func (c *HTTPCli) httpInner(ctx context.Context, method, url string, body interf
 	for _, option := range options {
 		option(c)
 	}
+
+	fmt.Printf("debug header: %+v\n", c.req.Header)
 
 	resp, err := c.client.Do(c.req)
 	if err != nil {

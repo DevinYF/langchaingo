@@ -105,7 +105,7 @@ func AsyncCall(ctx context.Context, req *ImageSynthesisRequest, httpcli httpclie
 //nolint:lll
 func CheckTaskStatus(ctx context.Context, req *TaskRequest, httpcli httpclient.IHttpClient, options ...httpclient.HTTPOption) (*TaskResponse, error) {
 	resp := TaskResponse{}
-	err := httpcli.Get(ctx, TaskURL(req.TaskID), &resp, options...)
+	err := httpcli.Get(ctx, TaskURL(req.TaskID), nil, &resp, options...)
 	if err != nil {
 		return nil, err
 	}

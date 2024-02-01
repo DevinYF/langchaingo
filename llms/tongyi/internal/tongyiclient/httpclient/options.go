@@ -1,6 +1,8 @@
 package httpclient
 
-import "time"
+import (
+	"time"
+)
 
 type HeaderMap map[string]string
 

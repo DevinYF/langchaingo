@@ -17,4 +17,5 @@ func (e *WrapMessageError) Error() string {
 var (
 	ErrModelNotSet   = errors.New("model is not set")
 	ErrEmptyResponse = errors.New("empty response")
+	ErrImageFilePrefix    = errors.New("file prefix is not supported, must be one of: file://, https://, http://")
 )

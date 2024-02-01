@@ -13,11 +13,49 @@ import (
 )
 
 //nolint:lll
+func SendMessage[T IQwenContent](ctx context.Context, payload *Request[T], cli httpclient.IHttpClient, url, token string) (*OutputResponse[T], error) {
+	if payload.Model == "" {
+		return nil, ErrModelNotSet
+	}
+
+	resp := OutputResponse[T]{}
+	tokenOpt := httpclient.WithTokenHeaderOption(token)
+
+	header := map[string]string{
+		"Content-Type": "application/json",
+	}
+	if payload.HasUploadOss {
+		header["X-DashScope-OssResourceResolve"] = "enable"
+	}
+
+	headerOpt := httpclient.WithHeader(header)
+
+	err := cli.Post(ctx, url, payload, &resp, tokenOpt, headerOpt)
+	if err != nil {
+		return nil, err
+	}
+	if len(resp.Output.Choices) == 0 {
+		return nil, ErrEmptyResponse
+	}
+	return &resp, nil
+}
+
+//nolint:lll
 func SendMessageStream[T IQwenContent](ctx context.Context, payload *Request[T], cli httpclient.IHttpClient, url, token string) (*OutputResponse[T], error) {
 	if payload.Model == "" {
 		return nil, ErrModelNotSet
 	}
-	responseChan := asyncChatStreaming(ctx, payload, cli, url, token)
+
+	header := map[string]string{
+		"Accept":       "text/event-stream",
+		"Content-Type": "application/json",
+	}
+
+	if payload.HasUploadOss {
+		header["X-DashScope-OssResourceResolve"] = "enable"
+	}
+
+	responseChan := asyncChatStreaming(ctx, payload, header, cli, url, token)
 
 	return iterateStreamChannel(ctx, responseChan, payload.StreamingFn)
 }
@@ -56,35 +94,18 @@ func iterateStreamChannel[T IQwenContent](ctx context.Context, channel <-chan St
 }
 
 //nolint:lll
-func SendMessage[T IQwenContent](ctx context.Context, payload *Request[T], cli httpclient.IHttpClient, url, token string) (*OutputResponse[T], error) {
-	if payload.Model == "" {
-		return nil, ErrModelNotSet
-	}
-
-	resp := OutputResponse[T]{}
-	tokenOpt := httpclient.WithTokenHeaderOption(token)
-
-	err := cli.Post(ctx, url, payload, &resp, tokenOpt)
-	if err != nil {
-		return nil, err
-	}
-	if len(resp.Output.Choices) == 0 {
-		return nil, ErrEmptyResponse
-	}
-	return &resp, nil
-}
-
-//nolint:lll
-func asyncChatStreaming[T IQwenContent](ctx context.Context, r *Request[T], cli httpclient.IHttpClient, url, token string) <-chan StreamOutput[T] {
+func asyncChatStreaming[T IQwenContent](
+	ctx context.Context,
+	payload *Request[T],
+	header map[string]string,
+	cli httpclient.IHttpClient,
+	url, token string,
+) <-chan StreamOutput[T] {
 	chanBuffer := 100
 	_respChunkChannel := make(chan StreamOutput[T], chanBuffer)
 
 	go func() {
-		withHeader := map[string]string{
-			"Accept": "text/event-stream",
-		}
-
-		_combineStreamingChunk(ctx, r, withHeader, _respChunkChannel, cli, url, token)
+		_combineStreamingChunk(ctx, payload, header, _respChunkChannel, cli, url, token)
 	}()
 	return _respChunkChannel
 }
@@ -98,7 +119,7 @@ func asyncChatStreaming[T IQwenContent](ctx context.Context, r *Request[T], cli 
 func _combineStreamingChunk[T IQwenContent](
 	ctx context.Context,
 	payload *Request[T],
-	withHeader map[string]string,
+	header map[string]string,
 	_respChunkChannel chan StreamOutput[T],
 	cli httpclient.IHttpClient,
 	url string,
@@ -108,7 +129,7 @@ func _combineStreamingChunk[T IQwenContent](
 	var _rawStreamOutChannel chan string
 
 	var err error
-	headerOpt := httpclient.WithHeader(withHeader)
+	headerOpt := httpclient.WithHeader(header)
 	tokenOpt := httpclient.WithTokenHeaderOption(token)
 
 	_rawStreamOutChannel, err = cli.PostSSE(ctx, url, payload, headerOpt, tokenOpt)

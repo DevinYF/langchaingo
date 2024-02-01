@@ -101,7 +101,8 @@ type Request[T IQwenContent] struct {
 	Input      Input[T]    `json:"input"`
 	Parameters *Parameters `json:"parameters,omitempty"`
 
-	StreamingFn StreamingFunc `json:"-"`
+	StreamingFn    StreamingFunc `json:"-"`
+	HasUploadOss bool          `json:"-"`
 }
 
 func (q *Request[T]) SetModel(value string) *Request[T] {

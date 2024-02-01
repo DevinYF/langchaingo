@@ -12,6 +12,7 @@ type IQwenContentMethods interface {
 	ToString() string
 	SetText(text string)
 	SetImage(url string)
+	PopImageContent() (VLContent, bool)
 	AppendText(text string)
 }
 
@@ -39,6 +40,10 @@ func (t *TextContent) SetText(text string) {
 
 func (t *TextContent) SetImage(_ string) {
 	panic("text-generation only model: can not use SetImage for TextContent")
+}
+
+func (vlist *TextContent) PopImageContent() (VLContent, bool) {
+	panic("text-generation only model: can not use PopImage for TextContent")
 }
 
 func (t *TextContent) AppendText(text string) {
@@ -85,6 +90,29 @@ func (vlist *VLContentList) SetImage(url string) {
 		panic("VLContentList is nil or empty")
 	}
 	*vlist = append(*vlist, VLContent{Image: url})
+}
+
+func (vlist *VLContentList) PopImageContent() (VLContent, bool) {
+	if vlist == nil {
+		panic("VLContentList is nil or empty")
+	}
+
+	isOk := false
+	for i, v := range *vlist {
+		if v.Image != "" {
+			isOk = true
+			preSlice := (*vlist)[:i]
+			if i == len(*vlist)-1 {
+				*vlist = preSlice
+			} else {
+				postSlice := (*vlist)[i+1:]
+				*vlist = append(preSlice, postSlice...)
+			}
+
+			return v, isOk
+		}
+	}
+	return VLContent{}, isOk
 }
 
 func (vlist *VLContentList) AppendText(s string) {

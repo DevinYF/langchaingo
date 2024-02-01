@@ -5,9 +5,9 @@ import (
 )
 
 const (
-	DashScopeBaseURL = "https://dashscope.aliyuncs.com"
-	QwenSubURL       = "/api/v1/services/aigc/text-generation/generation"
-	QwenVLSubURL     = "/api/v1/services/aigc/multimodal-generation/generation"
+	DashScopeBaseURL = "https://dashscope.aliyuncs.com/api"
+	QwenSubURL       = "/v1/services/aigc/text-generation/generation"
+	QwenVLSubURL     = "/v1/services/aigc/multimodal-generation/generation"
 )
 
 type ModelQwen string

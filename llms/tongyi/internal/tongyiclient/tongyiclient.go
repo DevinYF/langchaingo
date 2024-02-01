@@ -2,6 +2,7 @@ package tongyiclient
 
 import (
 	"context"
+	"strings"
 
 	embedding "github.com/tmc/langchaingo/llms/tongyi/internal/tongyiclient/embedding"
 	httpclient "github.com/tmc/langchaingo/llms/tongyi/internal/tongyiclient/httpclient"
@@ -40,6 +41,44 @@ func (q *TongyiClient) CreateCompletion(ctx context.Context, payload *qwen.Reque
 //nolint:lll
 func (q *TongyiClient) CreateVLCompletion(ctx context.Context, payload *qwen.Request[*qwen.VLContentList], url string) (*VLQwenResponse, error) {
 	payload = paylosdPreCheck(q, payload)
+	// Uploading URL...
+	// TODO: will upload the same image multiple times when this in history messages
+	// fmt.Println("upload images...")
+	for _, vMsg := range payload.Input.Messages {
+		if vMsg.Role == "user" {
+			if tmpImageContent, ok := vMsg.Content.PopImageContent(); ok {
+				var ossURL string
+				var err error
+				filepath := tmpImageContent.Image
+				// fmt.Println(">>> filepath: ", filepath)
+				switch {
+				case strings.HasPrefix(filepath, "file://"):
+					// fmt.Println(">>> 111111: ", filepath)
+					filepath = strings.TrimPrefix(filepath, "file://")
+					ossURL, err = qwen.UploadLocalImg(ctx, filepath, payload.Model, q.token)
+				case strings.HasPrefix(filepath, "https://") || strings.HasPrefix(filepath, "http://"):
+					// fmt.Println(">>> 2222222: ", filepath)
+					ossURL, err = qwen.UploadImgFromURL(ctx, filepath, payload.Model, q.token)
+				default:
+					return nil, ErrImageFilePrefix
+				}
+
+				if err != nil {
+					return nil, err
+				}
+				payload.HasUploadOss = true
+				// replace the image content with oss url
+				// fmt.Printf("after upload, ossURL: %s\n", ossURL)
+				vMsg.Content.SetImage(ossURL)
+			}
+		}
+	}
+
+	// =====================
+	// fmt.Printf("after upload:  %+v\n", payload.Input.Messages)
+	// msgJson, _ := json.Marshal(payload.Input.Messages)
+	// fmt.Printf("after upload:  %+v\n", string(msgJson))
+	// =====================
 	return genericCompletion(ctx, payload, q.httpCli, url, q.token)
 }
 

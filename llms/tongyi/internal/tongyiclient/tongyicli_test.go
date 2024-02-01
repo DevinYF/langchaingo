@@ -85,7 +85,7 @@ func TestStreamingChunk(t *testing.T) {
 
 	req := &TextRequest{
 		// Model: "qwen-turbo",
-		Input:         input,
+		Input:       input,
 		StreamingFn: streamCallbackFn,
 	}
 	resp, err := cli.CreateCompletion(ctx, req, qwen.URLQwen())
@@ -152,6 +152,7 @@ func TestVLStreamChund(t *testing.T) {
 		},
 		{
 			Image: "https://dashscope.oss-cn-beijing.aliyuncs.com/images/dog_and_girl.jpeg",
+			// Image: "https://pic.ntimg.cn/20140113/8800276_184351657000_2.jpg",
 		},
 	}
 
@@ -169,12 +170,14 @@ func TestVLStreamChund(t *testing.T) {
 	}
 
 	req := &VLRequest{
-		Model:         "qwen-vl-plus",
-		Input:         input,
+		Model:       "qwen-vl-plus",
+		Input:       input,
 		StreamingFn: streamCallbackFn,
 	}
 
 	resp, err := cli.CreateVLCompletion(ctx, req, qwen.URLQwenVL())
+
+	// fmt.Println("-->:", output)
 
 	require.NoError(t, err)
 	assert.Equal(t, output, resp.Output.Choices[0].Message.Content.ToString())
