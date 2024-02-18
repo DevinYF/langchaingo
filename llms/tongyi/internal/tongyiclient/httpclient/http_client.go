@@ -212,8 +212,6 @@ func (c *HTTPCli) httpInner(ctx context.Context, method, url string, body interf
 		option(c)
 	}
 
-	fmt.Printf("debug header: %+v\n", c.req.Header)
-
 	resp, err := c.client.Do(c.req)
 	if err != nil {
 		return nil, err
