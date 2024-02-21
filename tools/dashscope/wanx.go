@@ -1,10 +1,9 @@
-package tongyi
+package dashscope
 
 import (
 	"context"
 
 	"github.com/tmc/langchaingo/callbacks"
-	// wanx "github.com/tmc/langchaingo/tools/tongyi/internal/wanx"
 	wanx "github.com/devinyf/dashscopego/wanx"
 )
 
