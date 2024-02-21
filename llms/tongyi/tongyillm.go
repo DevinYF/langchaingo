@@ -3,11 +3,11 @@ package tongyi
 import (
 	"context"
 
+	tongyiclient "github.com/devinyf/dashscopego"
+	"github.com/devinyf/dashscopego/embedding"
+	"github.com/devinyf/dashscopego/qwen"
 	"github.com/tmc/langchaingo/callbacks"
 	"github.com/tmc/langchaingo/llms"
-	"github.com/tmc/langchaingo/llms/tongyi/internal/tongyiclient"
-	"github.com/tmc/langchaingo/llms/tongyi/internal/tongyiclient/embedding"
-	"github.com/tmc/langchaingo/llms/tongyi/internal/tongyiclient/qwen"
 )
 
 type LLM struct {

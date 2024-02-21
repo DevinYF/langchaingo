@@ -3,9 +3,9 @@ package tongyi
 import (
 	"fmt"
 
+	tongyiclient "github.com/devinyf/dashscopego"
+	"github.com/devinyf/dashscopego/qwen"
 	"github.com/tmc/langchaingo/llms"
-	"github.com/tmc/langchaingo/llms/tongyi/internal/tongyiclient"
-	"github.com/tmc/langchaingo/llms/tongyi/internal/tongyiclient/qwen"
 	"github.com/tmc/langchaingo/schema"
 )
 

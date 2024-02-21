@@ -1,11 +1,11 @@
 module github.com/tmc/langchaingo
 
-go 1.21
+go 1.21.0
 
 toolchain go1.21.4
 
 require (
-	github.com/google/uuid v1.4.0
+	github.com/google/uuid v1.6.0
 	github.com/stretchr/testify v1.8.4
 )
 
@@ -32,6 +32,7 @@ require (
 	github.com/davecgh/go-spew v1.1.1 // indirect
 	github.com/dlclark/regexp2 v1.8.1 // indirect
 	github.com/dustin/go-humanize v1.0.1 // indirect
+	github.com/gabriel-vasile/mimetype v1.4.3 // indirect
 	github.com/getsentry/sentry-go v0.12.0 // indirect
 	github.com/go-openapi/analysis v0.21.2 // indirect
 	github.com/go-openapi/errors v0.20.3 // indirect
@@ -51,6 +52,7 @@ require (
 	github.com/googleapis/gax-go/v2 v2.12.0 // indirect
 	github.com/goph/emperror v0.17.2 // indirect
 	github.com/gorilla/css v1.0.0 // indirect
+	github.com/gorilla/websocket v1.5.1 // indirect
 	github.com/grpc-ecosystem/go-grpc-middleware v1.3.0 // indirect
 	github.com/grpc-ecosystem/grpc-gateway/v2 v2.18.0 // indirect
 	github.com/huandu/xstrings v1.3.3 // indirect
@@ -95,6 +97,7 @@ require (
 	gitlab.com/golang-commonmark/puny v0.0.0-20191124015043-9f83538fa04f // indirect
 	go.mongodb.org/mongo-driver v1.11.3 // indirect
 	go.opencensus.io v0.24.0 // indirect
+	go.uber.org/mock v0.4.0 // indirect
 	golang.org/x/crypto v0.17.0 // indirect
 	golang.org/x/net v0.19.0 // indirect
 	golang.org/x/oauth2 v0.15.0 // indirect
@@ -116,13 +119,12 @@ require (
 	github.com/PuerkitoBio/goquery v1.8.1
 	github.com/amikos-tech/chroma-go v0.0.0-20231228181736-e8f5e927093e
 	github.com/cohere-ai/tokenizer v1.1.2
-	github.com/gabriel-vasile/mimetype v1.4.3
+	github.com/devinyf/dashscopego v0.0.1
 	github.com/go-openapi/strfmt v0.21.3
 	github.com/go-sql-driver/mysql v1.7.1
 	github.com/gocolly/colly v1.2.0
 	github.com/google/generative-ai-go v0.5.0
 	github.com/google/go-cmp v0.6.0
-	github.com/gorilla/websocket v1.4.1
 	github.com/jackc/pgx/v5 v5.4.1
 	github.com/ledongthuc/pdf v0.0.0-20220302134840-0c2507a12d80
 	github.com/mattn/go-sqlite3 v1.14.17
@@ -139,7 +141,6 @@ require (
 	github.com/weaviate/weaviate-go-client/v4 v4.8.1
 	gitlab.com/golang-commonmark/markdown v0.0.0-20211110145824-bf3e522c626a
 	go.starlark.net v0.0.0-20230302034142-4b1e35fe2254
-	go.uber.org/mock v0.4.0
 	golang.org/x/exp v0.0.0-20230713183714-613f0c0eb8a1
 	golang.org/x/tools v0.14.0
 	google.golang.org/api v0.152.0
