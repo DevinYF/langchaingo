@@ -6,6 +6,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/devinyf/dashscopego"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/tmc/langchaingo/llms"
@@ -20,7 +21,7 @@ const (
 
 func newQwenLlm(t *testing.T, model string) *LLM {
 	t.Helper()
-	dashscopeKey := os.Getenv(dashscopeTokenEnvName)
+	dashscopeKey := os.Getenv(dashscopego.DashscopeTokenEnvName)
 	if dashscopeKey == "" {
 		t.Skip("DASHSCOPE_API_KEY not set")
 		return nil

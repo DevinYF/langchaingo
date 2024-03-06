@@ -5,10 +5,6 @@ import (
 	"net/url"
 )
 
-const (
-	dashscopeTokenEnvName = "DASHSCOPE_API_KEY" //nolint:gosec
-)
-
 type options struct {
 	token        string
 	dashscopeURL *url.URL

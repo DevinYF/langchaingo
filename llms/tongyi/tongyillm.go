@@ -122,7 +122,7 @@ func (q *LLM) doTextCompletionRequest(ctx context.Context, qwenTextMessages []to
 		return nil, err
 	}
 
-	rsp, err := q.client.CreateCompletion(ctx, req, qwen.URLQwen())
+	rsp, err := q.client.CreateCompletion(ctx, req)
 	if err != nil {
 		if q.CallbackHandler != nil {
 			q.CallbackHandler.HandleLLMError(ctx, err)
@@ -144,7 +144,7 @@ func (q *LLM) doVLCompletionRequest(ctx context.Context, qwenVLMessages []tongyi
 		return nil, err
 	}
 
-	rsp, err := q.client.CreateVLCompletion(ctx, req, qwen.URLQwenVL())
+	rsp, err := q.client.CreateVLCompletion(ctx, req)
 	if err != nil {
 		if q.CallbackHandler != nil {
 			q.CallbackHandler.HandleLLMError(ctx, err)
