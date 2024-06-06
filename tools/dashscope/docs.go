@@ -8,7 +8,7 @@ package dashscope
   corrently implemented tools:
   	* wanx      (通义万相) - text to image generation
 
-  All tools in this package use the same API_KEY, also the same with llms/tongyi llm-models
+  All tools in this package use the dashscope API_KEY, also the same with llms/tongyi llm-models
   ```sh
   export DASHSCOPE_API_KEY=YOUR_DASHSCOPE_API_KEY
   ```

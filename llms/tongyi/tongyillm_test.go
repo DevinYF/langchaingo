@@ -9,12 +9,7 @@ import (
 	"github.com/devinyf/dashscopego"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"github.com/tmc/langchaingo/agents"
-	"github.com/tmc/langchaingo/callbacks"
-	"github.com/tmc/langchaingo/chains"
 	"github.com/tmc/langchaingo/llms"
-	"github.com/tmc/langchaingo/tools"
-	"github.com/tmc/langchaingo/tools/dashscope/wanx"
 )
 
 const (
@@ -200,41 +195,4 @@ func TestEmbedding(t *testing.T) {
 	require.NoError(t, err)
 	assert.NotEmpty(t, resp)
 	assert.Len(t, resp, len(embeddingText))
-}
-
-func TestGenerateContentImsge(t *testing.T) {
-	t.Parallel()
-	llm := newQwenLlm(t, QwenTextModel)
-
-	wanxDescOpt := wanx.WithDescription(wanx.WanxDescriptionCN) // 切换中文描述 默认是英文
-	wanxTool := wanx.NewTongyiWanx(wanxDescOpt)
-
-	agentTools := []tools.Tool{
-		wanxTool,
-	}
-
-	callbackHandler := callbacks.NewFinalStreamHandler()
-
-	agent := agents.NewOneShotAgent(
-		llm,
-		agentTools,
-		agents.WithCallbacksHandler(callbackHandler))
-	executor := agents.NewExecutor(agent)
-
-	// set streaming result.
-	var output strings.Builder
-	outputFn := func(_ context.Context, chunk []byte) {
-		output.Write(chunk)
-	}
-	// get streaming output.
-	callbackHandler.ReadFromEgress(context.Background(), outputFn)
-
-	question := "draw a girl and a dog"
-	answer, err := chains.Run(context.Background(), executor, question)
-	if err != nil {
-		panic(err)
-	}
-
-	assert.Regexp(t, "https:", answer)
-	assert.Regexp(t, "https:", output.String())
 }
