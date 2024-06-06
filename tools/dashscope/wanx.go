@@ -2,7 +2,6 @@ package dashscope
 
 import (
 	"context"
-	"fmt"
 	"os"
 	"strings"
 
@@ -21,8 +20,8 @@ type TongyiWanx struct {
 
 const (
 	_descriptionDefault = "A wrapper around Dashscope Wanx API. Useful for when you need to generate images from a text description. Input should be the textual description."
-	// TODO: 临时测试用
-	WanxDescriptionCn = "Dashscope TongyiWanx API 的封装, 当你需要根据文本描述生成图像时使用。输入应该是文本描述。"
+	// TongyiWanxDescriptionCn is the Chinese description for TongyiWanx.
+	WanxDescriptionCn = "Dashscope TongyiWanx API 的封装, 当你需要根据文本描述生成图像时使用。输入应该是文本描述。" //nolint:gosmopolitan
 )
 
 type options struct {
@@ -81,7 +80,7 @@ func (t TongyiWanx) Call(ctx context.Context, input string) (string, error) {
 			Prompt: input,
 		},
 		Params: wanx.ImageSynthesisParams{
-			// TODO: 暂时只生成1张图片
+			// TODO: current only generate one image.
 			N: 1,
 		},
 	}
@@ -94,15 +93,13 @@ func (t TongyiWanx) Call(ctx context.Context, input string) (string, error) {
 		return "", err
 	}
 
-	var imgURLList []string
+	imgURLList := []string{}
 
 	for _, img := range imbBlob {
 		imgURLList = append(imgURLList, img.ImgURL)
 	}
 
 	urls := strings.Join(imgURLList, t.separator)
-
-	fmt.Println("debug...urls: ", urls)
 
 	if t.CallbacksHandler != nil {
 		t.CallbacksHandler.HandleToolEnd(ctx, urls)

@@ -54,13 +54,13 @@ func (q *LLM) GenerateContent(ctx context.Context, messages []llms.MessageConten
 	return &llms.ContentResponse{Choices: choices}, nil
 }
 
-func (q *LLM) CreateEmbedding(ctx context.Context, inputTexts []string) ([][]float32, error) {
+func (q *LLM) CreateEmbedding(ctx context.Context, inputTexts []string) ([][]float64, error) {
 	input := struct {
 		Texts []string `json:"texts"`
 	}{
 		Texts: inputTexts,
 	}
-	embeddings, err := q.client.CreateEmbedding(ctx,
+	embeddings, _, err := q.client.CreateEmbedding(ctx,
 		&embedding.Request{
 			Input: input,
 		},

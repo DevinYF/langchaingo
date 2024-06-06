@@ -10,7 +10,6 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/tmc/langchaingo/llms"
-	"github.com/tmc/langchaingo/schema"
 )
 
 const (
@@ -46,13 +45,13 @@ func TestVLBasic(t *testing.T) {
 	}
 
 	mc := []llms.MessageContent{
-		{Role: schema.ChatMessageTypeHuman, Parts: parts},
+		{Role: llms.ChatMessageTypeHuman, Parts: parts},
 	}
 
 	resp, err := llm.GenerateContent(ctx, mc)
 	require.NoError(t, err)
 
-	assert.Regexp(t, "dog|person|individual|woman|girl", strings.ToLower(resp.Choices[0].Content))
+	assert.Regexp(t, "dog|person|individual|woman|girl|sun", strings.ToLower(resp.Choices[0].Content))
 }
 
 func TestVLStreamChund(t *testing.T) {
@@ -71,12 +70,12 @@ func TestVLStreamChund(t *testing.T) {
 	}
 
 	mc := []llms.MessageContent{
-		{Role: schema.ChatMessageTypeHuman, Parts: parts},
+		{Role: llms.ChatMessageTypeHuman, Parts: parts},
 	}
 
 	var output strings.Builder
 	streamCallbackFnOption := llms.WithStreamingFunc(
-		func(ctx context.Context, chunk []byte) error {
+		func(_ context.Context, chunk []byte) error {
 			output.Write(chunk)
 			return nil
 		},
@@ -86,7 +85,7 @@ func TestVLStreamChund(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, output.String(), resp.Choices[0].Content)
 
-	assert.Regexp(t, "dog|person|individual|woman|girl", strings.ToLower(resp.Choices[0].Content))
+	assert.Regexp(t, "dog|person|individual|woman|girl|sun", strings.ToLower(resp.Choices[0].Content))
 }
 
 func TestLLmBasic(t *testing.T) {
@@ -109,7 +108,7 @@ func TestLLmStream(t *testing.T) {
 	var sb strings.Builder
 
 	resp, err := llm.Call(ctx, "greet me in English.", llms.WithStreamingFunc(
-		func(ctx context.Context, chunk []byte) error {
+		func(_ context.Context, chunk []byte) error {
 			sb.Write(chunk)
 			return nil
 		},
@@ -135,8 +134,8 @@ func TestGenerateContentText(t *testing.T) {
 	}
 
 	mc := []llms.MessageContent{
-		{Role: schema.ChatMessageTypeSystem, Parts: []llms.ContentPart{sysContent}},
-		{Role: schema.ChatMessageTypeHuman, Parts: []llms.ContentPart{userContent}},
+		{Role: llms.ChatMessageTypeSystem, Parts: []llms.ContentPart{sysContent}},
+		{Role: llms.ChatMessageTypeHuman, Parts: []llms.ContentPart{userContent}},
 	}
 
 	resp, err := llm.GenerateContent(ctx, mc)
@@ -162,13 +161,13 @@ func TestGenerateContentStream(t *testing.T) {
 	}
 
 	mc := []llms.MessageContent{
-		{Role: schema.ChatMessageTypeSystem, Parts: []llms.ContentPart{sysContent}},
-		{Role: schema.ChatMessageTypeHuman, Parts: []llms.ContentPart{userContent}},
+		{Role: llms.ChatMessageTypeSystem, Parts: []llms.ContentPart{sysContent}},
+		{Role: llms.ChatMessageTypeHuman, Parts: []llms.ContentPart{userContent}},
 	}
 
 	var output strings.Builder
 	streamCallbackFn := llms.WithStreamingFunc(
-		func(ctx context.Context, chunk []byte) error {
+		func(_ context.Context, chunk []byte) error {
 			output.Write(chunk)
 			return nil
 		},

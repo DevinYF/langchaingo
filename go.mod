@@ -194,7 +194,7 @@ require (
 	github.com/aws/aws-sdk-go-v2/config v1.27.4
 	github.com/aws/aws-sdk-go-v2/service/bedrockruntime v1.7.1
 	github.com/cohere-ai/tokenizer v1.1.2
-	github.com/devinyf/dashscopego v0.0.2
+	github.com/devinyf/dashscopego v0.1.0
 	github.com/gage-technologies/mistral-go v1.0.0
 	github.com/go-openapi/strfmt v0.21.3
 	github.com/go-sql-driver/mysql v1.7.1
@@ -227,5 +227,3 @@ require (
 	google.golang.org/protobuf v1.34.1
 	gopkg.in/yaml.v3 v3.0.1
 )
-
-replace github.com/devinyf/dashscopego => /Users/devin/WorkSpace/opensource_project/dashscopego

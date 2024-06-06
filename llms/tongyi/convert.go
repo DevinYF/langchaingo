@@ -6,7 +6,6 @@ import (
 	tongyiclient "github.com/devinyf/dashscopego"
 	"github.com/devinyf/dashscopego/qwen"
 	"github.com/tmc/langchaingo/llms"
-	"github.com/tmc/langchaingo/schema"
 )
 
 // IQwenResponseConverter is an interface for converting tongyi response to llms.ContentChoice.
@@ -85,7 +84,7 @@ func genericMessageToQwenMessage[T qwen.IQwenContent](messagesContent []llms.Mes
 				}
 				foundText = true
 			case llms.ImageURLContent:
-				qmsg.Content.SetImage(pt.URL)
+				qmsg.Content.SetBlob(pt.URL)
 			case llms.BinaryContent:
 				panic("not implement BinaryContent yet")
 			default:
@@ -99,17 +98,19 @@ func genericMessageToQwenMessage[T qwen.IQwenContent](messagesContent []llms.Mes
 }
 
 // convert ChatMessageType to qwen role.
-func typeToQwenRole(typ schema.ChatMessageType) string {
+func typeToQwenRole(typ llms.ChatMessageType) string {
 	switch typ {
-	case schema.ChatMessageTypeSystem:
+	case llms.ChatMessageTypeSystem:
 		return "system"
-	case schema.ChatMessageTypeAI:
+	case llms.ChatMessageTypeAI:
 		return "assistant"
-	case schema.ChatMessageTypeHuman:
+	case llms.ChatMessageTypeHuman:
 		return "user"
-	case schema.ChatMessageTypeGeneric:
+	case llms.ChatMessageTypeGeneric:
 		return "user"
-	case schema.ChatMessageTypeFunction:
+	case llms.ChatMessageTypeFunction:
+		fallthrough
+	case llms.ChatMessageTypeTool:
 		fallthrough
 	default:
 		panic(&UnSupportedRoleError{Role: typ})

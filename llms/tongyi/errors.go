@@ -4,7 +4,7 @@ import (
 	"errors"
 	"fmt"
 
-	"github.com/tmc/langchaingo/schema"
+	"github.com/tmc/langchaingo/llms"
 )
 
 var (
@@ -19,7 +19,7 @@ var (
 )
 
 type UnSupportedRoleError struct {
-	Role schema.ChatMessageType
+	Role llms.ChatMessageType
 }
 
 func (e *UnSupportedRoleError) Error() string {
