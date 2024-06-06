@@ -51,7 +51,6 @@ func TestGetBufferString(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			tc := tc
 			t.Parallel()
 			result, err := llms.GetBufferString(tc.messages, tc.humanPrefix, tc.aiPrefix)
 			if (err != nil) != tc.expectError {

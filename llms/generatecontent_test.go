@@ -27,7 +27,6 @@ func TestTextParts(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			tt := tt
 			t.Parallel()
 			if got := TextParts(tt.args.role, tt.args.parts...); !reflect.DeepEqual(got, tt.want) {
 				t.Errorf("TextParts() = %v, want %v", got, tt.want)
