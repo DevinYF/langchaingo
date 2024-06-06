@@ -1,4 +1,4 @@
-package dashscope
+package wanx
 
 import (
 	"context"
@@ -19,9 +19,9 @@ type TongyiWanx struct {
 }
 
 const (
-	_descriptionDefault = "A wrapper around Dashscope Wanx API. Useful for when you need to generate images from a text description. Input should be the textual description."
+	WanxDescriptionEN = "A wrapper around Dashscope Wanx API. Useful for when you need to generate images from a text description. Input should be the textual description."
 	// TongyiWanxDescriptionCn is the Chinese description for TongyiWanx.
-	WanxDescriptionCn = "Dashscope TongyiWanx API 的封装, 当你需要根据文本描述生成图像时使用。输入应该是文本描述。" //nolint:gosmopolitan
+	WanxDescriptionCN = "Dashscope TongyiWanx API 的封装, 当你需要根据文本描述生成图像时使用。输入应该是文本描述。" //nolint:gosmopolitan
 )
 
 type options struct {
@@ -30,6 +30,7 @@ type options struct {
 
 type Option func(*options)
 
+// WithDescription sets the description of the tool.
 func WithDescription(description string) func(*options) {
 	return func(o *options) {
 		o.description = description
@@ -40,7 +41,7 @@ var _ tools.Tool = TongyiWanx{}
 
 func NewTongyiWanx(opts ...Option) *TongyiWanx {
 	o := options{
-		description: _descriptionDefault,
+		description: WanxDescriptionEN,
 	}
 
 	for _, opt := range opts {
@@ -83,6 +84,7 @@ func (t TongyiWanx) Call(ctx context.Context, input string) (string, error) {
 			// TODO: current only generate one image.
 			N: 1,
 		},
+		Download: false, // only return the image URL.
 	}
 
 	imbBlob, err := t.client.CreateImageGeneration(ctx, req)
