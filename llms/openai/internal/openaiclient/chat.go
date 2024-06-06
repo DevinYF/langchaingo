@@ -7,7 +7,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"log"
 	"net/http"
 	"strings"
 
@@ -32,40 +31,110 @@ type ChatRequest struct {
 	Stream           bool           `json:"stream,omitempty"`
 	FrequencyPenalty float64        `json:"frequency_penalty,omitempty"`
 	PresencePenalty  float64        `json:"presence_penalty,omitempty"`
+	Seed             int            `json:"seed,omitempty"`
 
-	// Function definitions to include in the request.
-	Functions []FunctionDefinition `json:"functions,omitempty"`
-	// FunctionCallBehavior is the behavior to use when calling functions.
-	//
-	// If a specific function should be invoked, use the format:
-	// `{"name": "my_function"}`
-	FunctionCallBehavior FunctionCallBehavior `json:"function_call,omitempty"`
+	// ResponseFormat is the format of the response.
+	ResponseFormat *ResponseFormat `json:"response_format,omitempty"`
+
+	// LogProbs indicates whether to return log probabilities of the output tokens or not.
+	// If true, returns the log probabilities of each output token returned in the content of message.
+	// This option is currently not available on the gpt-4-vision-preview model.
+	LogProbs bool `json:"logprobs,omitempty"`
+	// TopLogProbs is an integer between 0 and 5 specifying the number of most likely tokens to return at each
+	// token position, each with an associated log probability.
+	// logprobs must be set to true if this parameter is used.
+	TopLogProbs int `json:"top_logprobs,omitempty"`
+
+	Tools []Tool `json:"tools,omitempty"`
+	// This can be either a string or a ToolChoice object.
+	// If it is a string, it should be one of 'none', or 'auto', otherwise it should be a ToolChoice object specifying a specific tool to use.
+	ToolChoice any `json:"tool_choice,omitempty"`
 
 	// StreamingFunc is a function to be called for each chunk of a streaming response.
 	// Return an error to stop streaming early.
 	StreamingFunc func(ctx context.Context, chunk []byte) error `json:"-"`
+
+	// Deprecated: use Tools instead.
+	Functions []FunctionDefinition `json:"functions,omitempty"`
+	// Deprecated: use ToolChoice instead.
+	FunctionCallBehavior FunctionCallBehavior `json:"function_call,omitempty"`
+
+	// Metadata allows you to specify additional information that will be passed to the model.
+	Metadata map[string]any `json:"metadata,omitempty"`
+}
+
+// ToolType is the type of a tool.
+type ToolType string
+
+const (
+	ToolTypeFunction ToolType = "function"
+)
+
+// Tool is a tool to use in a chat request.
+type Tool struct {
+	Type     ToolType           `json:"type"`
+	Function FunctionDefinition `json:"function,omitempty"`
+}
+
+// ToolChoice is a choice of a tool to use.
+type ToolChoice struct {
+	Type     ToolType     `json:"type"`
+	Function ToolFunction `json:"function,omitempty"`
+}
+
+// ToolFunction is a function to be called in a tool choice.
+type ToolFunction struct {
+	Name      string `json:"name"`
+	Arguments string `json:"arguments"`
+}
+
+// ToolCall is a call to a tool.
+type ToolCall struct {
+	ID       string       `json:"id,omitempty"`
+	Type     ToolType     `json:"type"`
+	Function ToolFunction `json:"function,omitempty"`
+}
+
+// ResponseFormat is the format of the response.
+type ResponseFormat struct {
+	Type string `json:"type"`
 }
 
 // ChatMessage is a message in a chat request.
 type ChatMessage struct { //nolint:musttag
-	// The role of the author of this message. One of system, user, or assistant.
+	// The role of the author of this message. One of system, user, assistant, function, or tool.
 	Role string
+
 	// The content of the message.
+	// This field is mutually exclusive with MultiContent.
 	Content string
 
+	// MultiContent is a list of content parts to use in the message.
 	MultiContent []llms.ContentPart
 
 	// The name of the author of this message. May contain a-z, A-Z, 0-9, and underscores,
 	// with a maximum length of 64 characters.
 	Name string
 
-	// FunctionCall represents a function call to be made in the message.
+	// ToolCalls is a list of tools that were called in the message.
+	ToolCalls []ToolCall `json:"tool_calls,omitempty"`
+
+	// FunctionCall represents a function call that was made in the message.
+	// Deprecated: use ToolCalls instead.
 	FunctionCall *FunctionCall
+
+	// ToolCallID is the ID of the tool call this message is for.
+	// Only present in tool messages.
+	ToolCallID string `json:"tool_call_id,omitempty"`
 }
 
 func (m ChatMessage) MarshalJSON() ([]byte, error) {
 	if m.Content != "" && m.MultiContent != nil {
 		return nil, ErrContentExclusive
+	}
+	if text, ok := isSingleTextContent(m.MultiContent); ok {
+		m.Content = text
+		m.MultiContent = nil
 	}
 	if len(m.MultiContent) > 0 {
 		msg := struct {
@@ -73,7 +142,14 @@ func (m ChatMessage) MarshalJSON() ([]byte, error) {
 			Content      string             `json:"-"`
 			MultiContent []llms.ContentPart `json:"content,omitempty"`
 			Name         string             `json:"name,omitempty"`
-			FunctionCall *FunctionCall      `json:"function_call,omitempty"`
+			ToolCalls    []ToolCall         `json:"tool_calls,omitempty"`
+
+			// Deprecated: use ToolCalls instead.
+			FunctionCall *FunctionCall `json:"function_call,omitempty"`
+
+			// ToolCallID is the ID of the tool call this message is for.
+			// Only present in tool messages.
+			ToolCallID string `json:"tool_call_id,omitempty"`
 		}(m)
 		return json.Marshal(msg)
 	}
@@ -82,9 +158,23 @@ func (m ChatMessage) MarshalJSON() ([]byte, error) {
 		Content      string             `json:"content"`
 		MultiContent []llms.ContentPart `json:"-"`
 		Name         string             `json:"name,omitempty"`
-		FunctionCall *FunctionCall      `json:"function_call,omitempty"`
+		ToolCalls    []ToolCall         `json:"tool_calls,omitempty"`
+		// Deprecated: use ToolCalls instead.
+		FunctionCall *FunctionCall `json:"function_call,omitempty"`
+
+		// ToolCallID is the ID of the tool call this message is for.
+		// Only present in tool messages.
+		ToolCallID string `json:"tool_call_id,omitempty"`
 	}(m)
 	return json.Marshal(msg)
+}
+
+func isSingleTextContent(parts []llms.ContentPart) (string, bool) {
+	if len(parts) != 1 {
+		return "", false
+	}
+	tc, isText := parts[0].(llms.TextContent)
+	return tc.Text, isText
 }
 
 func (m *ChatMessage) UnmarshalJSON(data []byte) error {
@@ -93,7 +183,13 @@ func (m *ChatMessage) UnmarshalJSON(data []byte) error {
 		Content      string             `json:"content"`
 		MultiContent []llms.ContentPart `json:"-"` // not expected in response
 		Name         string             `json:"name,omitempty"`
-		FunctionCall *FunctionCall      `json:"function_call,omitempty"`
+		ToolCalls    []ToolCall         `json:"tool_calls,omitempty"`
+		// Deprecated: use ToolCalls instead.
+		FunctionCall *FunctionCall `json:"function_call,omitempty"`
+
+		// ToolCallID is the ID of the tool call this message is for.
+		// Only present in tool messages.
+		ToolCallID string `json:"tool_call_id,omitempty"`
 	}{}
 	err := json.Unmarshal(data, &msg)
 	if err != nil {
@@ -103,11 +199,52 @@ func (m *ChatMessage) UnmarshalJSON(data []byte) error {
 	return nil
 }
 
-// ChatChoice is a choice in a chat response.
-type ChatChoice struct {
-	Index        int         `json:"index"`
-	Message      ChatMessage `json:"message"`
-	FinishReason string      `json:"finish_reason"`
+type TopLogProbs struct {
+	Token   string  `json:"token"`
+	LogProb float64 `json:"logprob"`
+	Bytes   []byte  `json:"bytes,omitempty"`
+}
+
+// LogProb represents the probability information for a token.
+type LogProb struct {
+	Token   string  `json:"token"`
+	LogProb float64 `json:"logprob"`
+	Bytes   []byte  `json:"bytes,omitempty"` // Omitting the field if it is null
+	// TopLogProbs is a list of the most likely tokens and their log probability, at this token position.
+	// In rare cases, there may be fewer than the number of requested top_logprobs returned.
+	TopLogProbs []TopLogProbs `json:"top_logprobs"`
+}
+
+// LogProbs is the top-level structure containing the log probability information.
+type LogProbs struct {
+	// Content is a list of message content tokens with log probability information.
+	Content []LogProb `json:"content"`
+}
+
+type FinishReason string
+
+const (
+	FinishReasonStop          FinishReason = "stop"
+	FinishReasonLength        FinishReason = "length"
+	FinishReasonFunctionCall  FinishReason = "function_call"
+	FinishReasonToolCalls     FinishReason = "tool_calls"
+	FinishReasonContentFilter FinishReason = "content_filter"
+	FinishReasonNull          FinishReason = "null"
+)
+
+func (r FinishReason) MarshalJSON() ([]byte, error) {
+	if r == FinishReasonNull || r == "" {
+		return []byte("null"), nil
+	}
+	return []byte(`"` + string(r) + `"`), nil // best effort to not break future API changes
+}
+
+// ChatCompletionChoice is a choice in a chat response.
+type ChatCompletionChoice struct {
+	Index        int          `json:"index"`
+	Message      ChatMessage  `json:"message"`
+	FinishReason FinishReason `json:"finish_reason"`
+	LogProbs     *LogProbs    `json:"logprobs,omitempty"`
 }
 
 // ChatUsage is the usage of a chat completion request.
@@ -117,18 +254,15 @@ type ChatUsage struct {
 	TotalTokens      int `json:"total_tokens"`
 }
 
-// ChatResponse is a response to a chat request.
-type ChatResponse struct {
-	ID      string        `json:"id,omitempty"`
-	Created float64       `json:"created,omitempty"`
-	Choices []*ChatChoice `json:"choices,omitempty"`
-	Model   string        `json:"model,omitempty"`
-	Object  string        `json:"object,omitempty"`
-	Usage   struct {
-		CompletionTokens float64 `json:"completion_tokens,omitempty"`
-		PromptTokens     float64 `json:"prompt_tokens,omitempty"`
-		TotalTokens      float64 `json:"total_tokens,omitempty"`
-	} `json:"usage,omitempty"`
+// ChatCompletionResponse is a response to a chat request.
+type ChatCompletionResponse struct {
+	ID                string                  `json:"id,omitempty"`
+	Created           int64                   `json:"created,omitempty"`
+	Choices           []*ChatCompletionChoice `json:"choices,omitempty"`
+	Model             string                  `json:"model,omitempty"`
+	Object            string                  `json:"object,omitempty"`
+	Usage             ChatUsage               `json:"usage,omitempty"`
+	SystemFingerprint string                  `json:"system_fingerprint"`
 }
 
 // StreamedChatResponsePayload is a chunk from the stream.
@@ -143,9 +277,12 @@ type StreamedChatResponsePayload struct {
 			Role         string        `json:"role,omitempty"`
 			Content      string        `json:"content,omitempty"`
 			FunctionCall *FunctionCall `json:"function_call,omitempty"`
+			// ToolCalls is a list of tools that were called in the message.
+			ToolCalls []*ToolCall `json:"tool_calls,omitempty"`
 		} `json:"delta,omitempty"`
-		FinishReason string `json:"finish_reason,omitempty"`
+		FinishReason FinishReason `json:"finish_reason,omitempty"`
 	} `json:"choices,omitempty"`
+	Error error `json:"-"` // use for error handling only
 }
 
 // FunctionDefinition is a definition of a function that can be called by the model.
@@ -153,7 +290,7 @@ type FunctionDefinition struct {
 	// Name is the name of the function.
 	Name string `json:"name"`
 	// Description is a description of the function.
-	Description string `json:"description"`
+	Description string `json:"description,omitempty"`
 	// Parameters is a list of parameters for the function.
 	Parameters any `json:"parameters"`
 }
@@ -178,7 +315,7 @@ type FunctionCall struct {
 	Arguments string `json:"arguments"`
 }
 
-func (c *Client) createChat(ctx context.Context, payload *ChatRequest) (*ChatResponse, error) {
+func (c *Client) createChat(ctx context.Context, payload *ChatRequest) (*ChatCompletionResponse, error) {
 	if payload.StreamingFunc != nil {
 		payload.Stream = true
 	}
@@ -194,7 +331,7 @@ func (c *Client) createChat(ctx context.Context, payload *ChatRequest) (*ChatRes
 	if c.baseURL == "" {
 		c.baseURL = defaultBaseURL
 	}
-	req, err := http.NewRequestWithContext(ctx, http.MethodPost, c.buildURL("/chat/completions", c.Model), body)
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, c.buildURL("/chat/completions", payload.Model), body)
 	if err != nil {
 		return nil, err
 	}
@@ -224,11 +361,11 @@ func (c *Client) createChat(ctx context.Context, payload *ChatRequest) (*ChatRes
 		return parseStreamingChatResponse(ctx, r, payload)
 	}
 	// Parse response
-	var response ChatResponse
+	var response ChatCompletionResponse
 	return &response, json.NewDecoder(r.Body).Decode(&response)
 }
 
-func parseStreamingChatResponse(ctx context.Context, r *http.Response, payload *ChatRequest) (*ChatResponse, error) { //nolint:cyclop,lll
+func parseStreamingChatResponse(ctx context.Context, r *http.Response, payload *ChatRequest) (*ChatCompletionResponse, error) { //nolint:cyclop,lll
 	scanner := bufio.NewScanner(r.Body)
 	responseChan := make(chan StreamedChatResponsePayload)
 	go func() {
@@ -238,45 +375,56 @@ func parseStreamingChatResponse(ctx context.Context, r *http.Response, payload *
 			if line == "" {
 				continue
 			}
-			if !strings.HasPrefix(line, "data:") {
-				log.Fatalf("unexpected line: %v", line)
-			}
-			data := strings.TrimPrefix(line, "data: ")
+
+			data := strings.TrimPrefix(line, "data:") // here use `data:` instead of `data: ` for compatibility
+			data = strings.TrimSpace(data)
 			if data == "[DONE]" {
 				return
 			}
 			var streamPayload StreamedChatResponsePayload
 			err := json.NewDecoder(bytes.NewReader([]byte(data))).Decode(&streamPayload)
 			if err != nil {
-				log.Fatalf("failed to decode stream payload: %v", err)
+				streamPayload.Error = fmt.Errorf("error decoding streaming response: %w", err)
+				responseChan <- streamPayload
+				return
 			}
 			responseChan <- streamPayload
 		}
 		if err := scanner.Err(); err != nil {
-			log.Println("issue scanning response:", err)
+			responseChan <- StreamedChatResponsePayload{Error: fmt.Errorf("error reading streaming response: %w", err)}
+			return
 		}
 	}()
-	// Parse response
-	response := ChatResponse{
-		Choices: []*ChatChoice{
+	// Combine response
+	return combineStreamingChatResponse(ctx, payload, responseChan)
+}
+
+func combineStreamingChatResponse(ctx context.Context, payload *ChatRequest, responseChan chan StreamedChatResponsePayload) (*ChatCompletionResponse, error) {
+	response := ChatCompletionResponse{
+		Choices: []*ChatCompletionChoice{
 			{},
 		},
 	}
 
 	for streamResponse := range responseChan {
+		if streamResponse.Error != nil {
+			return nil, streamResponse.Error
+		}
+
 		if len(streamResponse.Choices) == 0 {
 			continue
 		}
-		chunk := []byte(streamResponse.Choices[0].Delta.Content)
-		response.Choices[0].Message.Content += streamResponse.Choices[0].Delta.Content
-		response.Choices[0].FinishReason = streamResponse.Choices[0].FinishReason
-		if streamResponse.Choices[0].Delta.FunctionCall != nil {
-			if response.Choices[0].Message.FunctionCall == nil {
-				response.Choices[0].Message.FunctionCall = streamResponse.Choices[0].Delta.FunctionCall
-			} else {
-				response.Choices[0].Message.FunctionCall.Arguments += streamResponse.Choices[0].Delta.FunctionCall.Arguments
-			}
-			chunk, _ = json.Marshal(response.Choices[0].Message.FunctionCall) // nolint:errchkjson
+		choice := streamResponse.Choices[0]
+		chunk := []byte(choice.Delta.Content)
+		response.Choices[0].Message.Content += choice.Delta.Content
+		response.Choices[0].FinishReason = choice.FinishReason
+
+		if choice.Delta.FunctionCall != nil {
+			chunk = updateFunctionCall(response.Choices[0].Message, choice.Delta.FunctionCall)
+		}
+
+		if len(choice.Delta.ToolCalls) > 0 {
+			chunk, response.Choices[0].Message.ToolCalls = updateToolCalls(response.Choices[0].Message.ToolCalls, choice.Delta.ToolCalls)
 		}
 
 		if payload.StreamingFunc != nil {
@@ -287,4 +435,65 @@ func parseStreamingChatResponse(ctx context.Context, r *http.Response, payload *
 		}
 	}
 	return &response, nil
+}
+
+func updateFunctionCall(message ChatMessage, functionCall *FunctionCall) []byte {
+	if message.FunctionCall == nil {
+		message.FunctionCall = functionCall
+	} else {
+		message.FunctionCall.Arguments += functionCall.Arguments
+	}
+	chunk, _ := json.Marshal(message.FunctionCall) // nolint:errchkjson
+	return chunk
+}
+
+func updateToolCalls(tools []ToolCall, delta []*ToolCall) ([]byte, []ToolCall) {
+	if len(delta) == 0 {
+		return []byte{}, tools
+	}
+	for _, t := range delta {
+		// if we have arguments append to the last Tool call
+		if t.Type == `` && t.Function.Arguments != `` {
+			lindex := len(tools) - 1
+			if lindex < 0 {
+				continue
+			}
+
+			tools[lindex].Function.Arguments += t.Function.Arguments
+			continue
+		}
+
+		// Otherwise, this is a new tool call, append that to the stack
+		tools = append(tools, *t)
+	}
+
+	chunk, _ := json.Marshal(delta) // nolint:errchkjson
+
+	return chunk, tools
+}
+
+// StreamingChatResponseTools is a helper function to append tool calls to the stack.
+func StreamingChatResponseTools(tools []ToolCall, delta []*ToolCall) ([]byte, []ToolCall) {
+	if len(delta) == 0 {
+		return []byte{}, tools
+	}
+	for _, t := range delta {
+		// if we have arguments append to the last Tool call
+		if t.Type == `` && t.Function.Arguments != `` {
+			lindex := len(tools) - 1
+			if lindex < 0 {
+				continue
+			}
+
+			tools[lindex].Function.Arguments += t.Function.Arguments
+			continue
+		}
+
+		// Otherwise, this is a new tool call, append that to the stack
+		tools = append(tools, *t)
+	}
+
+	chunk, _ := json.Marshal(delta) // nolint:errchkjson
+
+	return chunk, tools
 }

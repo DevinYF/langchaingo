@@ -23,10 +23,10 @@ func getEmbedder(t *testing.T) (embeddings.Embedder, error) {
 	if openaiKey := os.Getenv("OPENAI_API_KEY"); openaiKey == "" {
 		t.Skip("OPENAI_API_KEY not set")
 	}
-	url := os.Getenv("OPENAI_BASE_URL")
-	opts := []openai.Option{}
-	if url != "" {
-		opts = append(opts, openai.WithBaseURL(url))
+
+	opts := []openai.Option{
+		openai.WithModel("gpt-3.5-turbo-0125"),
+		openai.WithEmbeddingModel("text-embedding-ada-002"),
 	}
 
 	llm, err := openai.New(opts...)
@@ -36,9 +36,14 @@ func getEmbedder(t *testing.T) (embeddings.Embedder, error) {
 
 func getNewStore(t *testing.T, opts ...Option) (Store, error) {
 	t.Helper()
+	e, err := getEmbedder(t)
+	if err != nil {
+		return Store{}, err
+	}
+
 	url := os.Getenv("MILVUS_URL")
 	if url == "" {
-		milvusContainer, err := tcmilvus.RunContainer(context.Background(), testcontainers.WithImage("milvusdb/milvus:v2.3.9"))
+		milvusContainer, err := tcmilvus.RunContainer(context.Background(), testcontainers.WithImage("milvusdb/milvus:v2.4.0-rc.1-latest"))
 		if err != nil && strings.Contains(err.Error(), "Cannot connect to the Docker daemon") {
 			t.Skip("Docker not available")
 		}
@@ -54,10 +59,6 @@ func getNewStore(t *testing.T, opts ...Option) (Store, error) {
 	}
 	config := client.Config{
 		Address: url,
-	}
-	e, err := getEmbedder(t)
-	if err != nil {
-		return Store{}, err
 	}
 	idx, err := entity.NewIndexAUTOINDEX(entity.L2)
 	if err != nil {

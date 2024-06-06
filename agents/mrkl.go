@@ -41,7 +41,7 @@ var _ Agent = (*OneShotZeroAgent)(nil)
 // NewOneShotAgent creates a new OneShotZeroAgent with the given LLM model, tools,
 // and options. It returns a pointer to the created agent. The opts parameter
 // represents the options for the agent.
-func NewOneShotAgent(llm llms.Model, tools []tools.Tool, opts ...CreationOption) *OneShotZeroAgent {
+func NewOneShotAgent(llm llms.Model, tools []tools.Tool, opts ...Option) *OneShotZeroAgent {
 	options := mrklDefaultOptions()
 	for _, opt := range opts {
 		opt(&options)
@@ -113,6 +113,10 @@ func (a *OneShotZeroAgent) GetInputKeys() []string {
 
 func (a *OneShotZeroAgent) GetOutputKeys() []string {
 	return []string{a.OutputKey}
+}
+
+func (a *OneShotZeroAgent) GetTools() []tools.Tool {
+	return a.Tools
 }
 
 func (a *OneShotZeroAgent) parseOutput(output string) ([]schema.AgentAction, *schema.AgentFinish, error) {
